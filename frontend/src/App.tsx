@@ -1,0 +1,128 @@
+import { useState } from 'react'
+import { AuthProvider, useAuth } from './lib/AuthContext'
+import { DialogProvider } from './components/Dialog'
+import AppShell, { visibleNav, type NavKey } from './components/AppShell'
+import LoginPage from './pages/LoginPage'
+import DashboardPage from './pages/DashboardPage'
+import CompaniesPage from './pages/CompaniesPage'
+import UsersPage from './pages/UsersPage'
+import ProjectsPage from './pages/ProjectsPage'
+import SaleUnitsPage from './pages/SaleUnitsPage'
+import LocationsPage from './pages/LocationsPage'
+import AdminPage from './pages/AdminPage'
+import SystemAdminPage from './pages/SystemAdminPage'
+import EntitiesPage from './pages/EntitiesPage'
+import ProfessionalsPage from './pages/ProfessionalsPage'
+import TemplatesPage from './pages/TemplatesPage'
+import TemplateEditorPage from './pages/TemplateEditorPage'
+import ProjectEditorPage from './pages/ProjectEditorPage'
+import MalfunctionsPage from './pages/MalfunctionsPage'
+import UnitDefectsPage from './pages/UnitDefectsPage'
+import SystemLocationsPage from './pages/SystemLocationsPage'
+
+// Pages reachable only from inside SystemAdminPage — not in the sidebar but
+// still valid as `current`. Gated implicitly by access to system_admin.
+const SYSTEM_ADMIN_SUBPAGES: NavKey[] = [
+  'companies',
+  'system_users',
+  'entities',
+  'professionals',
+  'templates',
+  'system_locations',
+]
+// Sub-pages of the company admin (ניהול חברה).
+const ADMIN_SUBPAGES: NavKey[] = ['company_users', 'company_templates', 'locations']
+const MALFUNCTION_SUBPAGES: NavKey[] = ['unit_defects']
+
+/** Parses the URL for stand-alone editor routes that open in their own tab. */
+type EditorRoute =
+  | { kind: 'template-new' }
+  | { kind: 'template-edit'; id: number }
+  | { kind: 'project-edit'; id: number }
+  | null
+
+function readEditorRoute(): EditorRoute {
+  const path = window.location.pathname.replace(/\/+$/, '')
+  if (path === '/templates/new') return { kind: 'template-new' }
+  const t = path.match(/^\/templates\/edit\/(\d+)$/)
+  if (t) return { kind: 'template-edit', id: parseInt(t[1], 10) }
+  const p = path.match(/^\/projects\/edit\/(\d+)$/)
+  if (p) return { kind: 'project-edit', id: parseInt(p[1], 10) }
+  return null
+}
+
+function ProtectedShell() {
+  const { user, loading } = useAuth()
+  const [current, setCurrent] = useState<NavKey>('dashboard')
+  const [unitDefectsCtx, setUnitDefectsCtx] = useState<{ projectId: number; unitId: number } | null>(null)
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>
+        <span style={{ color: 'var(--color-text-light)' }}>טוען…</span>
+      </div>
+    )
+  }
+  if (!user) return <LoginPage />
+
+  const nav = visibleNav(user.role)
+  const isValid =
+    nav.some((n) => n.key === current) ||
+    SYSTEM_ADMIN_SUBPAGES.includes(current) ||
+    ADMIN_SUBPAGES.includes(current) ||
+    MALFUNCTION_SUBPAGES.includes(current)
+  const safe: NavKey = isValid ? current : nav[0]?.key ?? 'dashboard'
+
+  return (
+    <AppShell current={safe} onNavigate={setCurrent}>
+      {safe === 'dashboard' && <DashboardPage />}
+      {safe === 'companies' && <CompaniesPage />}
+      {safe === 'system_users' && <UsersPage scope="system" />}
+      {safe === 'company_users' && <UsersPage scope="company" />}
+      {safe === 'projects' && <ProjectsPage />}
+      {safe === 'sale_units' && <SaleUnitsPage />}
+      {safe === 'locations' && <LocationsPage />}
+      {safe === 'admin' && <AdminPage onNavigate={setCurrent} />}
+      {safe === 'system_admin' && <SystemAdminPage onNavigate={setCurrent} />}
+      {safe === 'entities' && <EntitiesPage onNavigate={setCurrent} />}
+      {safe === 'professionals' && <ProfessionalsPage onNavigate={setCurrent} />}
+      {safe === 'templates' && <TemplatesPage onNavigate={setCurrent} scope="system" />}
+      {safe === 'company_templates' && <TemplatesPage onNavigate={setCurrent} scope="company" />}
+      {safe === 'system_locations' && <SystemLocationsPage onNavigate={setCurrent} />}
+      {safe === 'malfunctions' && (
+        <MalfunctionsPage
+          onOpenUnit={(pid, uid) => {
+            setUnitDefectsCtx({ projectId: pid, unitId: uid })
+            setCurrent('unit_defects')
+          }}
+        />
+      )}
+      {safe === 'unit_defects' && unitDefectsCtx && (
+        <UnitDefectsPage
+          projectId={unitDefectsCtx.projectId}
+          unitId={unitDefectsCtx.unitId}
+          onNavigate={setCurrent}
+        />
+      )}
+    </AppShell>
+  )
+}
+
+export default function App() {
+  const editorRoute = readEditorRoute()
+  return (
+    <AuthProvider>
+      <DialogProvider>
+        {editorRoute?.kind === 'template-new' ? (
+          <TemplateEditorPage editingId={null} />
+        ) : editorRoute?.kind === 'template-edit' ? (
+          <TemplateEditorPage editingId={editorRoute.id} />
+        ) : editorRoute?.kind === 'project-edit' ? (
+          <ProjectEditorPage projectId={editorRoute.id} />
+        ) : (
+          <ProtectedShell />
+        )}
+      </DialogProvider>
+    </AuthProvider>
+  )
+}
