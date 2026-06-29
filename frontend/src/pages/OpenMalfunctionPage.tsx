@@ -109,6 +109,17 @@ export default function OpenMalfunctionPage() {
   const [openedAt, setOpenedAt] = useState(today)
   const [saving, setSaving] = useState(false)
 
+  // Repair activities (how the defect was handled) — built locally, saved with
+  // the defect on submit. Each: date · description · who performed.
+  type ActivityRow = { occurred_on: string; action: string; performed_by: string }
+  const [activities, setActivities] = useState<ActivityRow[]>([])
+  const addActivityRow = () =>
+    setActivities((a) => [...a, { occurred_on: today, action: '', performed_by: '' }])
+  const updateActivityRow = (i: number, patch: Partial<ActivityRow>) =>
+    setActivities((a) => a.map((row, idx) => (idx === i ? { ...row, ...patch } : row)))
+  const removeActivityRow = (i: number) =>
+    setActivities((a) => a.filter((_, idx) => idx !== i))
+
   useEffect(() => {
     if (needsCompany) return
     const cid = user?.role === 'super_admin' ? companyId ?? undefined : undefined
@@ -189,6 +200,7 @@ export default function OpenMalfunctionPage() {
     setEntranceId(null)
     setUnitId(null)
     setLocationId(null)
+    setActivities([])
   }
 
   async function submit() {
@@ -202,7 +214,7 @@ export default function OpenMalfunctionPage() {
     }
     setSaving(true)
     try {
-      await Malfunctions.create({
+      const created = await Malfunctions.create({
         project_id: projectId,
         project_item_id: effectiveItemId,
         location_id: locationId,
@@ -213,6 +225,15 @@ export default function OpenMalfunctionPage() {
         professional: professional.trim() || null,
         opened_at: openedAt || null,
       })
+      // Persist the repair activities under the new defect.
+      for (const act of activities) {
+        if (!act.action.trim()) continue
+        await Malfunctions.addActivity(created.id, {
+          occurred_on: act.occurred_on || null,
+          action: act.action.trim(),
+          performed_by: act.performed_by.trim() || null,
+        })
+      }
       alert({ title: 'נשמר', message: 'התקלה נפתחה בהצלחה', variant: 'success' })
       resetForm()
     } catch (e) {
@@ -251,20 +272,30 @@ export default function OpenMalfunctionPage() {
           padding: '20px 22px',
         }}
       >
-        <Field label="פרויקט">
-          <select
-            style={strongInputStyle}
-            value={projectId ?? ''}
-            onChange={(e) => setProjectId(e.target.value ? Number(e.target.value) : null)}
-          >
-            <option value="">— בחר פרויקט —</option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </Field>
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
+          <Field label="פרויקט">
+            <select
+              style={strongInputStyle}
+              value={projectId ?? ''}
+              onChange={(e) => setProjectId(e.target.value ? Number(e.target.value) : null)}
+            >
+              <option value="">— בחר פרויקט —</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="תאריך פתיחה">
+            <input
+              type="date"
+              style={strongInputStyle}
+              value={openedAt}
+              onChange={(e) => setOpenedAt(e.target.value)}
+            />
+          </Field>
+        </div>
 
         {loadingTree ? (
           <div style={{ color: 'var(--color-text-light)', fontSize: '0.85rem', marginBottom: 16 }}>
@@ -386,14 +417,66 @@ export default function OpenMalfunctionPage() {
             </select>
           </Field>
         </div>
-        <Field label="תאריך פתיחה">
-          <input
-            type="date"
-            style={strongInputStyle}
-            value={openedAt}
-            onChange={(e) => setOpenedAt(e.target.value)}
-          />
-        </Field>
+
+        <div style={{ marginTop: 4, borderTop: '1px solid var(--color-border)', paddingTop: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <label style={labelStyle}>פעילויות תיקון — כיצד טופלה התקלה</label>
+            <button
+              type="button"
+              onClick={addActivityRow}
+              className="tact-btn tact-btn-ghost"
+              style={{ padding: '5px 12px', fontSize: '0.8rem' }}
+            >
+              + הוסף פעילות
+            </button>
+          </div>
+          {activities.length === 0 ? (
+            <div style={{ fontSize: '0.8rem', color: 'var(--color-text-light)' }}>
+              עדיין אין פעילויות. לחץ "+ הוסף פעילות" כדי לתעד כיצד טופלה התקלה.
+            </div>
+          ) : (
+            activities.map((act, i) => (
+              <div
+                key={i}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '150px 1fr 170px 34px',
+                  gap: 8,
+                  marginBottom: 8,
+                  alignItems: 'center',
+                }}
+              >
+                <input
+                  type="date"
+                  style={strongInputStyle}
+                  value={act.occurred_on}
+                  onChange={(e) => updateActivityRow(i, { occurred_on: e.target.value })}
+                />
+                <input
+                  style={strongInputStyle}
+                  placeholder="תיאור הפעילות"
+                  value={act.action}
+                  onChange={(e) => updateActivityRow(i, { action: e.target.value })}
+                />
+                <input
+                  style={strongInputStyle}
+                  placeholder="מי ביצע"
+                  value={act.performed_by}
+                  onChange={(e) => updateActivityRow(i, { performed_by: e.target.value })}
+                />
+                <button
+                  type="button"
+                  onClick={() => removeActivityRow(i)}
+                  className="tact-btn tact-btn-ghost"
+                  title="מחק פעילות"
+                  style={{ padding: '6px', fontSize: '0.85rem', color: 'var(--color-accent)' }}
+                >
+                  ✕
+                </button>
+              </div>
+            ))
+          )}
+        </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 6 }}>
           <button
