@@ -8,6 +8,7 @@ from .buyer import Buyer
 from .unit_customer import UnitCustomer
 from .location import Location, LocationCatalog
 from .system_location import SystemLocation
+from .attachment import Attachment
 from .malfunction import (
     Malfunction,
     MalfunctionActivity,
@@ -33,6 +34,7 @@ __all__ = [
     "Location",
     "LocationCatalog",
     "SystemLocation",
+    "Attachment",
     "Malfunction",
     "MalfunctionActivity",
     "MalfunctionAttachment",

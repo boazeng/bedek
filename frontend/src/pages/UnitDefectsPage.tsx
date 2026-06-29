@@ -11,6 +11,7 @@ import { useAuth } from '../lib/AuthContext'
 import { useAlert } from '../components/Dialog'
 import DefectFormDialog from '../components/DefectFormDialog'
 import ActivityFormDialog from '../components/ActivityFormDialog'
+import AttachmentsPanel from '../components/AttachmentsPanel'
 
 type Props = {
   projectId: number
@@ -376,7 +377,7 @@ function DefectRow({
                   </button>
                 </div>
               )}
-              <DefectDetailView detail={detail} />
+              <DefectDetailView detail={detail} canWrite={canWrite} />
             </>
           )}
         </div>
@@ -385,7 +386,7 @@ function DefectRow({
   )
 }
 
-function DefectDetailView({ detail }: { detail: MalfunctionDetail }) {
+function DefectDetailView({ detail, canWrite }: { detail: MalfunctionDetail; canWrite: boolean }) {
   return (
     <div>
       <div
@@ -471,6 +472,10 @@ function DefectDetailView({ detail }: { detail: MalfunctionDetail }) {
             ))}
           </ol>
         )}
+      </div>
+
+      <div style={{ marginTop: 18 }}>
+        <AttachmentsPanel target={{ malfunctionId: detail.id }} canWrite={canWrite} />
       </div>
     </div>
   )

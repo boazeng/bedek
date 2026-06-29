@@ -715,6 +715,63 @@ export const Malfunctions = {
     }),
 }
 
+// ---------- Attachments (files on a malfunction or a project item) ----------
+export type Attachment = {
+  id: number
+  malfunction_id: number | null
+  project_item_id: number | null
+  original_filename: string | null
+  content_type: string | null
+  size_bytes: number | null
+  uploaded_at: string
+  download_url: string | null
+}
+
+export type AttachmentTarget = { malfunctionId?: number; projectItemId?: number }
+
+type PresignResponse = {
+  storage_key: string
+  upload_url: string
+  method: string
+  content_type: string | null
+}
+
+export const Attachments = {
+  list: (t: AttachmentTarget) =>
+    api<Attachment[]>('/api/attachments', {
+      query: { malfunction_id: t.malfunctionId, project_item_id: t.projectItemId },
+    }),
+  remove: (id: number) => api<void>(`/api/attachments/${id}`, { method: 'DELETE' }),
+
+  /** Full presigned upload: presign → PUT bytes to storage → record the row. */
+  async upload(file: File, t: AttachmentTarget): Promise<Attachment> {
+    const target = {
+      malfunction_id: t.malfunctionId ?? null,
+      project_item_id: t.projectItemId ?? null,
+    }
+    const presign = await api<PresignResponse>('/api/attachments/presign', {
+      method: 'POST',
+      body: { ...target, filename: file.name, content_type: file.type || 'application/octet-stream' },
+    })
+    const res = await fetch(presign.upload_url, {
+      method: 'PUT',
+      headers: { 'Content-Type': presign.content_type || file.type || 'application/octet-stream' },
+      body: file,
+    })
+    if (!res.ok) throw new ApiError(res.status, `העלאת הקובץ נכשלה (${res.status})`)
+    return api<Attachment>('/api/attachments', {
+      method: 'POST',
+      body: {
+        ...target,
+        storage_key: presign.storage_key,
+        original_filename: file.name,
+        content_type: file.type || null,
+        size_bytes: file.size,
+      },
+    })
+  },
+}
+
 export const Locations = {
   list: (companyId?: number) =>
     api<LocationRow[]>('/api/locations', { query: { company_id: companyId } }),

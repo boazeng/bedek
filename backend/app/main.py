@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
 from .database import Base, engine, ensure_schema_migrations
 from .api import (
+    attachments,
     auth,
     buyers,
     companies,
@@ -55,6 +56,7 @@ def create_app() -> FastAPI:
     app.include_router(project_items.router)
     app.include_router(malfunctions.router)
     app.include_router(buyers.router)
+    app.include_router(attachments.router)
     return app
 
 

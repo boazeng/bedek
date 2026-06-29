@@ -259,6 +259,12 @@ Resources:
             - Endpoint: !GetAtt Database.Endpoint.Address
           # CORS is unused (same-origin via CloudFront) but kept harmless/explicit.
           CORS_ORIGINS: '*'
+          # File attachments → S3 (presigned uploads/downloads).
+          STORAGE_BACKEND: s3
+          UPLOADS_BUCKET: !Ref UploadsBucket
+      Policies:
+        - S3CrudPolicy:
+            BucketName: !Sub cmm-bedek-uploads-${AWS::AccountId}
       Events:
         Proxy:
           Type: HttpApi
@@ -326,6 +332,25 @@ Resources:
             Condition:
               StringEquals:
                 AWS:SourceArn: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${Distribution}
+
+  # --- Uploads: private S3 bucket for attachments (presigned PUT/GET) ----
+  UploadsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub cmm-bedek-uploads-${AWS::AccountId}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      CorsConfiguration:
+        # Presigned URLs gate access by signature, so origin can be permissive.
+        CorsRules:
+          - AllowedMethods: [GET, PUT]
+            AllowedOrigins: ['*']
+            AllowedHeaders: ['*']
+            ExposedHeaders: [ETag]
+            MaxAge: 3000
 
   OriginAccessControl:
     Type: AWS::CloudFront::OriginAccessControl

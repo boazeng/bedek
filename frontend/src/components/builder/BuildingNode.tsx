@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import { ProjectTree, type CrmCustomer, type ProjectItemNode } from '../../lib/api'
 import { EditableText, MiniBtn, type CollapseCmd } from './shared'
 import EntranceNode from './EntranceNode'
+import AttachmentsPanel from '../AttachmentsPanel'
 
 type Props = {
   projectId: number
@@ -15,6 +17,7 @@ const ENTRANCE_LETTERS = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ז', 'ח', 'ט', 
 
 export default function BuildingNode({ projectId, building, onRefresh, onConfirmDelete, collapseCmd, customers }: Props) {
   const entrances = building.children
+  const [showDocs, setShowDocs] = useState(false)
 
   async function rename(next: string) {
     await ProjectTree.update(projectId, building.id, { name: next })
@@ -55,10 +58,27 @@ export default function BuildingNode({ projectId, building, onRefresh, onConfirm
         </span>
         <span style={{ flex: 1 }} />
         <MiniBtn onClick={addEntrance}>+ כניסה</MiniBtn>
+        <MiniBtn onClick={() => setShowDocs((v) => !v)} title="מסמכים של הבניין">
+          {showDocs ? 'הסתר מסמכים' : 'מסמכים'}
+        </MiniBtn>
         <MiniBtn onClick={remove} danger title="מחק בניין">
           מחק
         </MiniBtn>
       </div>
+
+      {showDocs && (
+        <div
+          style={{
+            background: 'var(--color-bg-white)',
+            border: '1px solid var(--color-border)',
+            borderRadius: 10,
+            padding: '10px 12px',
+            marginBottom: 10,
+          }}
+        >
+          <AttachmentsPanel target={{ projectItemId: building.id }} title="מסמכי הבניין" />
+        </div>
+      )}
 
       <div style={{ paddingInlineStart: 8 }}>
         {entrances.map((e) => (

@@ -39,6 +39,15 @@ class Settings(BaseSettings):
     # integration is disabled.
     crm_service_key: str = ""
 
+    # --- File storage (attachments / media) ---
+    # 'local' writes to uploads_local_dir and serves via the API (dev);
+    # 's3' uses presigned PUT/GET against uploads_bucket (prod).
+    storage_backend: str = "local"
+    uploads_bucket: str = ""
+    uploads_local_dir: str = "./uploads"
+    # Presigned URL lifetime (seconds).
+    upload_url_ttl: int = 900
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
