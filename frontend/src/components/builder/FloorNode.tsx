@@ -14,6 +14,7 @@ type Props = {
 export default function FloorNode({ projectId, floor, onRefresh, onConfirmDelete }: Props) {
   const [addOpen, setAddOpen] = useState(false)
   const [dragOver, setDragOver] = useState(false)
+  const [collapsed, setCollapsed] = useState(false)
   const units = floor.children
 
   async function rename(next: string) {
@@ -84,8 +85,19 @@ export default function FloorNode({ projectId, floor, onRefresh, onConfirmDelete
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px' }}>
+        <MiniBtn
+          onClick={() => setCollapsed((c) => !c)}
+          title={collapsed ? 'הרחב קומה' : 'כווץ קומה'}
+        >
+          {collapsed ? '▸' : '▾'}
+        </MiniBtn>
         <span style={{ fontSize: '0.9rem' }}>🏬</span>
         <EditableText value={floor.name} onSave={rename} bold width={150} />
+        {units.length > 0 && (
+          <span style={{ fontSize: '0.75rem', color: 'var(--color-text-light)' }}>
+            ({units.length} יחידות)
+          </span>
+        )}
         <span style={{ flex: 1 }} />
         <MiniBtn onClick={() => setAddOpen(true)}>+ יחידות</MiniBtn>
         <MiniBtn onClick={duplicate} title="שכפל את הקומה וכל היחידות שבה">שכפל</MiniBtn>
@@ -94,7 +106,7 @@ export default function FloorNode({ projectId, floor, onRefresh, onConfirmDelete
         </MiniBtn>
       </div>
 
-      {units.length === 0 && (
+      {!collapsed && units.length === 0 && (
         <div
           style={{
             margin: '0 10px 8px',
@@ -110,7 +122,34 @@ export default function FloorNode({ projectId, floor, onRefresh, onConfirmDelete
         </div>
       )}
 
-      {units.length > 0 && (
+      {/* Collapsed view: compact pills with only the unit type + number. */}
+      {collapsed && units.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '0 10px 10px' }}>
+          {units.map((u) => (
+            <span
+              key={u.id}
+              title={u.customer_name || undefined}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                padding: '4px 12px',
+                borderRadius: 999,
+                border: '1px solid var(--color-border)',
+                background: 'var(--color-bg-white)',
+                fontSize: '0.78rem',
+                color: 'var(--color-text)',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <span style={{ fontWeight: 600 }}>{UNIT_TYPE_LABEL[u.unit_type || ''] || 'יחידה'}</span>
+              <span style={{ color: 'var(--color-text-light)' }}>{u.short_code || u.number || ''}</span>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {!collapsed && units.length > 0 && (
         <div style={{ padding: '0 10px 8px' }}>
           {units.map((u) => (
             <div
