@@ -52,8 +52,33 @@ export default function FloorNode({ projectId, floor, onRefresh, onConfirmDelete
     await ProjectTree.bulkAddUnits(projectId, floor.id, { unit_type: unitType, count: 1 })
     onRefresh()
   }
+  // "Duplicate" = add the next floor: bump the floor number (קומה 3 → קומה 4)
+  // and recreate the same unit mix, with apartment numbers continuing the
+  // entrance sequence (last apartment 12 → new floor starts at 13).
   async function duplicate() {
-    await ProjectTree.duplicate(projectId, floor.id)
+    const match = floor.name.match(/(\d+)\s*$/)
+    const nextName = match
+      ? floor.name.replace(/\d+\s*$/, String(Number(match[1]) + 1))
+      : `${floor.name} (עותק)`
+    const created = await ProjectTree.create(projectId, {
+      kind: 'floor',
+      name: nextName,
+      parent_id: floor.parent_id,
+    })
+
+    const apartments = units.filter((u) => u.unit_type === 'apartment').length
+    if (apartments > 0) {
+      // start_number omitted → backend continues from the next free number in the entrance.
+      await ProjectTree.bulkAddUnits(projectId, created.id, { unit_type: 'apartment', count: apartments })
+    }
+    for (const u of units) {
+      if (!u.unit_type || u.unit_type === 'apartment') continue
+      await ProjectTree.bulkAddUnits(projectId, created.id, {
+        unit_type: u.unit_type,
+        count: 1,
+        number: u.short_code || u.number || null,
+      })
+    }
     onRefresh()
   }
 
