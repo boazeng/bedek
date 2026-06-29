@@ -1,6 +1,7 @@
 const TOKEN_KEY = 'cmm-token'
 const COMPANY_KEY = 'cmm-active-company-id'
 const PROJECT_KEY = 'cmm-active-project'
+const UNIT_KEY = 'cmm-work-scope'
 
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY)
@@ -12,6 +13,7 @@ export function clearToken() {
   localStorage.removeItem(TOKEN_KEY)
   localStorage.removeItem(COMPANY_KEY)
   localStorage.removeItem(PROJECT_KEY)
+  localStorage.removeItem(UNIT_KEY)
 }
 
 /** For super_admin: which tenant to view. Ignored for other roles. */
@@ -40,6 +42,37 @@ export function getActiveProject(): ActiveProject | null {
 export function setActiveProject(p: ActiveProject | null) {
   if (p === null) localStorage.removeItem(PROJECT_KEY)
   else localStorage.setItem(PROJECT_KEY, JSON.stringify(p))
+}
+
+/** The building → entrance → unit the user is currently working on. Each level
+ *  is null until chosen. Persisted so it survives reloads. */
+export type WorkScope = {
+  buildingId: number | null
+  buildingName: string | null
+  entranceId: number | null
+  entranceName: string | null
+  unitId: number | null
+  unitName: string | null
+}
+export const EMPTY_WORK_SCOPE: WorkScope = {
+  buildingId: null,
+  buildingName: null,
+  entranceId: null,
+  entranceName: null,
+  unitId: null,
+  unitName: null,
+}
+export function getWorkScope(): WorkScope {
+  const v = localStorage.getItem(UNIT_KEY)
+  if (!v) return EMPTY_WORK_SCOPE
+  try {
+    return { ...EMPTY_WORK_SCOPE, ...JSON.parse(v) }
+  } catch {
+    return EMPTY_WORK_SCOPE
+  }
+}
+export function setWorkScope(s: WorkScope) {
+  localStorage.setItem(UNIT_KEY, JSON.stringify(s))
 }
 
 type ApiOptions = {

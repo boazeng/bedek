@@ -15,7 +15,11 @@ import {
   setActiveCompanyId,
   getActiveProject,
   setActiveProject as persistActiveProject,
+  getWorkScope,
+  setWorkScope as persistWorkScope,
+  EMPTY_WORK_SCOPE,
   type ActiveProject,
+  type WorkScope,
   type CurrentUser,
 } from './api'
 
@@ -26,12 +30,15 @@ type AuthState = {
   activeCompanyId: number | null
   /** The project the user is currently working on (global selection). */
   activeProject: ActiveProject | null
+  /** The building → entrance → unit the user is currently working on. */
+  workScope: WorkScope
   loginAs: (email: string) => Promise<void>
   loginWithPassword: (email: string, password: string) => Promise<void>
   loginWithGoogle: (credential: string) => Promise<void>
   logout: () => void
   setActiveCompany: (id: number | null) => void
   setActiveProject: (p: ActiveProject | null) => void
+  setWorkScope: (s: WorkScope) => void
   refresh: () => Promise<void>
 }
 
@@ -46,6 +53,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [activeProject, setActiveProjectState] = useState<ActiveProject | null>(
     getActiveProject(),
   )
+  const [workScope, setWorkScopeState] = useState<WorkScope>(getWorkScope())
+
+  const setWorkScope = useCallback((s: WorkScope) => {
+    persistWorkScope(s)
+    setWorkScopeState(s)
+  }, [])
 
   const refresh = useCallback(async () => {
     try {
@@ -69,6 +82,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Fresh session — drop any project carried over from a previous login.
     persistActiveProject(null)
     setActiveProjectState(null)
+    persistWorkScope(EMPTY_WORK_SCOPE)
+    setWorkScopeState(EMPTY_WORK_SCOPE)
     // For non-super_admin set their own company as active; super_admin must pick.
     if (me.role !== 'super_admin' && me.company_id) {
       setActiveCompanyId(me.company_id)
@@ -102,11 +117,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
     setActiveCompanyIdState(null)
     setActiveProjectState(null)
+    setWorkScopeState(EMPTY_WORK_SCOPE)
   }, [])
 
   const setActiveProject = useCallback((p: ActiveProject | null) => {
     persistActiveProject(p)
     setActiveProjectState(p)
+    // Switching projects invalidates the building/entrance/unit selection.
+    persistWorkScope(EMPTY_WORK_SCOPE)
+    setWorkScopeState(EMPTY_WORK_SCOPE)
   }, [])
 
   const setActiveCompany = useCallback((id: number | null) => {
@@ -115,6 +134,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // A project belongs to one company — switching tenant invalidates it.
     persistActiveProject(null)
     setActiveProjectState(null)
+    persistWorkScope(EMPTY_WORK_SCOPE)
+    setWorkScopeState(EMPTY_WORK_SCOPE)
   }, [])
 
   const value = useMemo<AuthState>(
@@ -123,15 +144,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       activeCompanyId,
       activeProject,
+      workScope,
       loginAs,
       loginWithPassword,
       loginWithGoogle,
       logout,
       setActiveCompany,
       setActiveProject,
+      setWorkScope,
       refresh,
     }),
-    [user, loading, activeCompanyId, activeProject, loginAs, loginWithPassword, loginWithGoogle, logout, setActiveCompany, setActiveProject, refresh],
+    [user, loading, activeCompanyId, activeProject, workScope, loginAs, loginWithPassword, loginWithGoogle, logout, setActiveCompany, setActiveProject, setWorkScope, refresh],
   )
 
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>

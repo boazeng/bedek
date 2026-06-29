@@ -3,6 +3,7 @@ import { useAuth } from '../lib/AuthContext'
 import TactLogo from './TactLogo'
 import TactIcon from './TactIcon'
 import CompanyPicker from './CompanyPicker'
+import WorkScopePicker from './WorkScopePicker'
 
 export type NavKey =
   | 'dashboard'
@@ -220,6 +221,7 @@ export default function AppShell({ current, onNavigate, children }: Props) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <CompanyPicker />
             <ActiveProjectBadge />
+            <WorkScopePicker />
           </div>
         </div>
         <div style={{ padding: '24px 28px', flex: 1 }}>{children}</div>
