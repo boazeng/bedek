@@ -113,14 +113,18 @@ export default function CompaniesPage() {
 
   async function remove(c: Company) {
     const ok = await confirm({
-      title: 'השבתת חברה',
-      message: `להשבית את החברה "${c.name}"? הסטטוס יסומן כלא פעיל (לא נמחק).`,
+      title: 'מחיקת חברה',
+      message: `למחוק לצמיתות את החברה "${c.name}"? כל הפרויקטים והתקלות שלה יימחקו יחד איתה. פעולה בלתי הפיכה.`,
       variant: 'danger',
-      confirmLabel: 'השבת',
+      confirmLabel: 'מחק לצמיתות',
     })
     if (!ok) return
-    await Companies.remove(c.id)
-    load()
+    try {
+      await Companies.remove(c.id)
+      load()
+    } catch (e) {
+      setError(String(e))
+    }
   }
 
   return (
@@ -188,7 +192,7 @@ export default function CompaniesPage() {
                 ערוך
               </button>
               <button onClick={() => remove(r)} className="tact-btn tact-btn-ghost" style={{ padding: '6px 14px', fontSize: '0.8rem', color: 'var(--color-accent)' }}>
-                השבת
+                מחק
               </button>
             </div>
           )}

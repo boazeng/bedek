@@ -83,6 +83,7 @@ def delete_company(
     company = db.query(Company).filter(Company.id == company_id).first()
     if not company:
         return
-    # Soft delete: mark inactive (preserves audit trail).
-    company.is_active = False
+    # Hard delete — removes the company and, via ON DELETE CASCADE on company_id,
+    # all its projects, project items, malfunctions, buyers and locations.
+    db.delete(company)
     db.commit()
