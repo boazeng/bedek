@@ -3,6 +3,7 @@
 Listed on the customers page (optionally filtered to the active project) and
 selectable as a unit's customer in the project structure builder."""
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from ..deps import get_current_user, get_db, require_company_admin
@@ -57,7 +58,9 @@ def list_buyers(
     cid = _resolve_company(actor, company_id, db)
     q = db.query(Buyer).filter(Buyer.company_id == cid)
     if project_id is not None:
-        q = q.filter(Buyer.project_id == project_id)
+        # Include company-level buyers (no project yet) so they can be assigned
+        # to this project's units.
+        q = q.filter(or_(Buyer.project_id == project_id, Buyer.project_id.is_(None)))
     return [_out(b) for b in q.order_by(Buyer.id).all()]
 
 
