@@ -75,30 +75,6 @@ class ProjectOut(BaseModel):
     created_at: datetime
 
 
-# ---------- Sale Units ----------
-class SaleUnitIn(BaseModel):
-    project_id: int
-    unit_type: str
-    unit_number: str
-    entrance: str | None = None
-    floor: str | None = None
-    buyer_id: int | None = None
-
-
-class SaleUnitOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    company_id: int
-    project_id: int
-    unit_type: str
-    unit_number: str
-    entrance: str | None
-    floor: str | None
-    buyer_id: int | None
-    created_at: datetime
-
-
 # ---------- Locations (sub-entities) ----------
 class LocationIn(BaseModel):
     name: str
@@ -136,27 +112,6 @@ class BuyerOut(BaseModel):
     email: str | None
     national_id: str | None
     created_at: datetime
-
-
-# ---------- Entity types (system-wide complex entities) ----------
-class EntityTypeIn(BaseModel):
-    name: str
-    code: str | None = None
-    # ProjectItem kind this entity instantiates as (building/floor/unit/location).
-    kind: str = "unit"
-    sort_order: int = 0
-    is_active: bool = True
-
-
-class EntityTypeOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    name: str
-    code: str | None
-    kind: str
-    sort_order: int
-    is_active: bool
 
 
 # ---------- Professionals (system-wide catalog of trade classifications) ----------

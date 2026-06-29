@@ -39,7 +39,6 @@ export default function LocationsPage({ onNavigate }: Props) {
   const companyId = useEffectiveCompanyId()
   const confirm = useConfirm()
   const alert = useAlert()
-  const [importing, setImporting] = useState(false)
   const [rows, setRows] = useState<LocationRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -94,33 +93,6 @@ export default function LocationsPage({ onNavigate }: Props) {
       load()
     } catch (e) {
       setSaveErr(String(e))
-    }
-  }
-
-  async function importFromSystem() {
-    const ok = await confirm({
-      title: 'יבוא ממיקומי מערכת',
-      message:
-        'הקטלוג הקיים של החברה יימחק לחלוטין ויוחלף ברשימת מיקומי המערכת ' +
-        'הפעילים (לפי הסדר שלהם). פעולה זו לא ניתנת לביטול. להמשיך?',
-      variant: 'danger',
-      confirmLabel: 'יבא והחלף',
-    })
-    if (!ok) return
-    setImporting(true)
-    try {
-      const cid = user?.role === 'super_admin' ? companyId ?? undefined : undefined
-      const summary = await Locations.importFromSystem(cid)
-      await alert({
-        title: 'היבוא הסתיים',
-        message: `נטענו ממיקומי מערכת: ${summary.added}\nנמחקו (קטלוג קודם): ${summary.deleted}`,
-        variant: 'success',
-      })
-      load()
-    } catch (e) {
-      alert({ title: 'שגיאת יבוא', message: String(e), variant: 'danger' })
-    } finally {
-      setImporting(false)
     }
   }
 
@@ -191,14 +163,6 @@ export default function LocationsPage({ onNavigate }: Props) {
             style={{ padding: '8px 16px', fontSize: '0.85rem' }}
           >
             ← חזרה לניהול חברה
-          </button>
-          <button
-            onClick={importFromSystem}
-            className="tact-btn tact-btn-ghost"
-            disabled={importing || needsCompany}
-            title="הוסף לקטלוג את כל המיקומים הפעילים מרשימת מיקומי המערכת"
-          >
-            {importing ? 'מייבא…' : '⤓ יבא ממיקומי מערכת'}
           </button>
           <button onClick={openCreate} className="tact-btn tact-btn-primary">
             + מיקום חדש

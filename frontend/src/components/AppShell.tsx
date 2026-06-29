@@ -14,15 +14,10 @@ export type NavKey =
   | 'unit_defects'       // sub-page of malfunctions (no sidebar entry)
   | 'admin'
   | 'system_admin'
-  | 'entities'           // sub-page of system_admin
   | 'professionals'      // sub-page of system_admin
-  | 'templates'          // system-scope templates page (under system_admin)
-  | 'company_templates'  // company-scope templates page (under admin)
   | 'company_professionals' // company-scope trade classifications (under admin)
-  | 'system_locations'   // sub-page of system_admin
   | 'system_users'       // sub-page of system_admin — super_admin users
   | 'company_users'      // sub-page of admin — company-scoped users
-  | 'sale_units'         // legacy — no sidebar entry, page still exists
 
 type NavItem = {
   key: NavKey

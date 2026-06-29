@@ -12,7 +12,8 @@ from ..deps import (
 from ..models import (
     Company,
     Project,
-    SaleUnit,
+    ProjectItem,
+    ProjectItemKind,
     Malfunction,
     MalfunctionStatus,
     MalfunctionSource,
@@ -172,10 +173,12 @@ def get_dashboard(
         .scalar()
         or 0
     )
-    unit_filter = SaleUnit.company_id == company.id
+    unit_filter = (ProjectItem.company_id == company.id) & (
+        ProjectItem.kind == ProjectItemKind.UNIT
+    )
     if allowed_ids is not None:
-        unit_filter = unit_filter & SaleUnit.project_id.in_(allowed_ids)
-    total_units = db.query(func.count(SaleUnit.id)).filter(unit_filter).scalar() or 0
+        unit_filter = unit_filter & ProjectItem.project_id.in_(allowed_ids)
+    total_units = db.query(func.count(ProjectItem.id)).filter(unit_filter).scalar() or 0
 
     by_status = _status_breakdown_from_row(company_row)
     by_source = _source_breakdown_from_row(company_row)

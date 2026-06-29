@@ -1,6 +1,7 @@
-"""Project tree: per-project instances of buildings → floors → units → locations.
+"""Project tree: per-project instances of buildings → entrances → floors → units.
 
 Single self-referential table forms the tree. `kind` distinguishes the level.
+The leaf `unit` is the sale unit (יחידת ממכר) and carries `unit_type`.
 """
 from datetime import datetime
 from enum import StrEnum
@@ -12,10 +13,20 @@ from ..database import Base
 
 
 class ProjectItemKind(StrEnum):
-    BUILDING = "building"
-    FLOOR = "floor"
-    UNIT = "unit"
-    LOCATION = "location"
+    BUILDING = "building"      # בניין
+    ENTRANCE = "entrance"      # כניסה
+    FLOOR = "floor"            # קומה
+    UNIT = "unit"              # יחידת ממכר (leaf; has unit_type)
+
+
+class SaleUnitType(StrEnum):
+    """Type of a leaf `unit` node (sale unit / יחידת ממכר)."""
+
+    APARTMENT = "apartment"        # דירה
+    PARKING = "parking"            # חניה
+    STORAGE = "storage"            # מחסן
+    SHOP = "shop"                  # חנות
+    PUBLIC_AREA = "public_area"    # ציבורי
 
 
 class ProjectItem(Base):
@@ -41,6 +52,8 @@ class ProjectItem(Base):
     kind: Mapped[str] = mapped_column(String(20), nullable=False)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     number: Mapped[str | None] = mapped_column(String(40))
+    # Sale-unit type — only set on leaf `unit` rows (apartment/parking/…).
+    unit_type: Mapped[str | None] = mapped_column(String(30))
     direction: Mapped[str | None] = mapped_column(String(20))
     # Optional override for the "קומה" column. When null, the value is derived
     # from the nearest FLOOR ancestor's name. When set, this string wins.
@@ -52,14 +65,6 @@ class ProjectItem(Base):
     # Free-text customer label shown inline beside the name in the tree UI.
     # (Free text for now; could later be promoted to a FK on the buyers table.)
     customer_name: Mapped[str | None] = mapped_column(String(200))
-
-    # Optional metadata pointing back to system catalogs.
-    entity_type_id: Mapped[int | None] = mapped_column(
-        ForeignKey("entity_types.id", ondelete="SET NULL")
-    )
-    template_id: Mapped[int | None] = mapped_column(
-        ForeignKey("templates.id", ondelete="SET NULL")
-    )
 
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(

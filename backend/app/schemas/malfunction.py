@@ -51,6 +51,8 @@ class MalfunctionListItem(BaseModel):
     id: int
     project_item_id: int | None
     project_item_name: str | None = None
+    location_id: int | None = None
+    location_name: str | None = None
     status: str
     source: str
     group: str
@@ -70,6 +72,8 @@ class MalfunctionDetail(BaseModel):
     project_item_id: int | None
     project_item_name: str | None = None
     project_item_number: str | None = None
+    location_id: int | None = None
+    location_name: str | None = None
     status: str
     source: str
     group: str
@@ -98,6 +102,7 @@ class MalfunctionCreate(BaseModel):
 
     project_id: int
     project_item_id: int | None = None
+    location_id: int | None = None   # classification from company location catalog
     buyer_id: int | None = None
     description: str
     status: str = "pending_manager"

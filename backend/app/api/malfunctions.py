@@ -117,6 +117,7 @@ def create_defect(
         company_id=project.company_id,
         project_id=body.project_id,
         project_item_id=body.project_item_id,
+        location_id=body.location_id,
         buyer_id=body.buyer_id,
         status=body.status,
         source=body.source,

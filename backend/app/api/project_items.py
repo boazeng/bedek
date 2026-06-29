@@ -1,4 +1,4 @@
-"""Project tree endpoints — view and mutate the buildings/floors/units/locations
+"""Project tree endpoints — view and mutate the buildings/entrances/floors/units
 tree of a single project. Thin router; logic lives in services/project_items.py."""
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -9,26 +9,41 @@ from ..deps import (
     require_company_admin,
     user_can_access_project,
 )
-from ..models import Project, ProjectItem, Template, User, UserRole
+from ..models import Project, ProjectItem, User
 from ..schemas.project_item import (
-    ApplyTemplateRequest,
+    BulkAddUnitsRequest,
     DuplicateResponse,
     ProjectItemIn,
     ProjectItemNode,
     ProjectItemUpdate,
     ReorderRequest,
 )
-from ..schemas.template import SaveAsTemplateRequest, TemplateOut
 from ..services import project_items as svc
-from ..services import templates as templates_svc
 
 
 router = APIRouter(prefix="/api/projects/{project_id}/tree", tags=["project-tree"])
 
 
-def _get_project_for_write(
-    project_id: int, actor: User, db: Session
-) -> Project:
+def _node(item: ProjectItem) -> ProjectItemNode:
+    """Serialize a single item (no children) for create/update responses."""
+    return ProjectItemNode(
+        id=item.id,
+        project_id=item.project_id,
+        parent_id=item.parent_id,
+        kind=item.kind,
+        name=item.name,
+        number=item.number,
+        unit_type=item.unit_type,
+        direction=item.direction,
+        sort_order=item.sort_order,
+        temp_apt_number=item.temp_apt_number,
+        permanent_apt_number=item.permanent_apt_number,
+        customer_name=item.customer_name,
+        children=[],
+    )
+
+
+def _get_project_for_write(project_id: int, actor: User, db: Session) -> Project:
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
@@ -37,15 +52,24 @@ def _get_project_for_write(
     return project
 
 
+def _item_in_project(db: Session, project_id: int, item_id: int) -> ProjectItem:
+    item = (
+        db.query(ProjectItem)
+        .filter(ProjectItem.id == item_id, ProjectItem.project_id == project_id)
+        .first()
+    )
+    if not item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    return item
+
+
 @router.get("", response_model=list[ProjectItemNode])
 def get_project_tree(
     project_id: int,
     db: Session = Depends(get_db),
     actor: User = Depends(get_current_user),
 ):
-    project = (
-        db.query(Project).filter(Project.id == project_id).first()
-    )
+    project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
     if not user_can_access_project(actor, project, db):
@@ -53,11 +77,7 @@ def get_project_tree(
     return svc.get_tree(db, project_id)
 
 
-@router.post(
-    "/items",
-    response_model=ProjectItemNode,
-    status_code=status.HTTP_201_CREATED,
-)
+@router.post("/items", response_model=ProjectItemNode, status_code=status.HTTP_201_CREATED)
 def create_project_item(
     project_id: int,
     body: ProjectItemIn,
@@ -65,13 +85,8 @@ def create_project_item(
     actor: User = Depends(require_company_admin),
 ):
     project = _get_project_for_write(project_id, actor, db)
-    # Validate parent is in same project.
     if body.parent_id is not None:
-        parent = (
-            db.query(ProjectItem)
-            .filter(ProjectItem.id == body.parent_id)
-            .first()
-        )
+        parent = db.query(ProjectItem).filter(ProjectItem.id == body.parent_id).first()
         if not parent or parent.project_id != project_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -85,24 +100,11 @@ def create_project_item(
         kind=body.kind,
         name=body.name,
         number=body.number,
+        unit_type=body.unit_type,
         direction=body.direction,
-        entity_type_id=body.entity_type_id,
-        template_id=body.template_id,
     )
     db.commit()
-    return svc.get_tree(db, project_id)[-1] if False else ProjectItemNode(
-        id=item.id,
-        project_id=item.project_id,
-        parent_id=item.parent_id,
-        kind=item.kind,
-        name=item.name,
-        number=item.number,
-        direction=item.direction,
-        entity_type_id=item.entity_type_id,
-        template_id=item.template_id,
-        sort_order=item.sort_order,
-        children=[],
-    )
+    return _node(item)
 
 
 @router.put("/items/{item_id}", response_model=ProjectItemNode)
@@ -114,18 +116,13 @@ def update_project_item(
     actor: User = Depends(require_company_admin),
 ):
     _get_project_for_write(project_id, actor, db)
-    item = (
-        db.query(ProjectItem)
-        .filter(ProjectItem.id == item_id, ProjectItem.project_id == project_id)
-        .first()
-    )
-    if not item:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    item = _item_in_project(db, project_id, item_id)
     svc.update_item(
         db,
         item,
         name=body.name,
         number=body.number,
+        unit_type=body.unit_type,
         direction=body.direction,
         floor=body.floor,
         temp_apt_number=body.temp_apt_number,
@@ -133,22 +130,7 @@ def update_project_item(
         customer_name=body.customer_name,
     )
     db.commit()
-    return ProjectItemNode(
-        id=item.id,
-        project_id=item.project_id,
-        parent_id=item.parent_id,
-        kind=item.kind,
-        name=item.name,
-        number=item.number,
-        direction=item.direction,
-        entity_type_id=item.entity_type_id,
-        template_id=item.template_id,
-        sort_order=item.sort_order,
-        temp_apt_number=item.temp_apt_number,
-        permanent_apt_number=item.permanent_apt_number,
-        customer_name=item.customer_name,
-        children=[],
-    )
+    return _node(item)
 
 
 @router.delete("/items/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -171,6 +153,48 @@ def delete_project_item(
 
 
 @router.post(
+    "/floors/{floor_id}/units",
+    response_model=list[ProjectItemNode],
+    status_code=status.HTTP_201_CREATED,
+)
+def add_units_to_floor(
+    project_id: int,
+    floor_id: int,
+    body: BulkAddUnitsRequest,
+    db: Session = Depends(get_db),
+    actor: User = Depends(require_company_admin),
+):
+    """Bulk-add sale units to a floor (apartments auto-number per entrance)."""
+    project = _get_project_for_write(project_id, actor, db)
+    floor = _item_in_project(db, project_id, floor_id)
+    created = svc.bulk_add_units(
+        db,
+        company_id=project.company_id,
+        project_id=project_id,
+        floor=floor,
+        unit_type=body.unit_type,
+        count=body.count,
+        start_number=body.start_number,
+        number=body.number,
+    )
+    db.commit()
+    return [_node(c) for c in created]
+
+
+@router.post("/renumber", status_code=status.HTTP_200_OK)
+def renumber_project(
+    project_id: int,
+    db: Session = Depends(get_db),
+    actor: User = Depends(require_company_admin),
+):
+    """Re-sequence apartment numbers 1..N within each entrance."""
+    _get_project_for_write(project_id, actor, db)
+    changed = svc.renumber_apartments(db, project_id)
+    db.commit()
+    return {"renumbered": changed}
+
+
+@router.post(
     "/items/{item_id}/duplicate",
     response_model=DuplicateResponse,
     status_code=status.HTTP_201_CREATED,
@@ -181,53 +205,12 @@ def duplicate_project_item(
     db: Session = Depends(get_db),
     actor: User = Depends(require_company_admin),
 ):
-    """Deep-clone an item (with all descendants) as a sibling of the original.
-    Returns the new root's id so the UI can auto-expand the cloned subtree."""
+    """Deep-clone an item (with all descendants) as a sibling of the original."""
     _get_project_for_write(project_id, actor, db)
-    item = (
-        db.query(ProjectItem)
-        .filter(ProjectItem.id == item_id, ProjectItem.project_id == project_id)
-        .first()
-    )
-    if not item:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    item = _item_in_project(db, project_id, item_id)
     new_root = svc.duplicate_subtree(db, item)
     db.commit()
     return DuplicateResponse(new_id=new_root.id, tree=svc.get_tree(db, project_id))
-
-
-@router.post(
-    "/items/{item_id}/save-as-template",
-    response_model=TemplateOut,
-    status_code=status.HTTP_201_CREATED,
-)
-def save_subtree_as_template(
-    project_id: int,
-    item_id: int,
-    body: SaveAsTemplateRequest,
-    db: Session = Depends(get_db),
-    actor: User = Depends(require_company_admin),
-):
-    """Snapshot a project subtree (and all descendants) into a company template
-    that can be reapplied later. Internal sub-templates are auto-generated for
-    each nested floor/unit so the structure round-trips on apply."""
-    project = _get_project_for_write(project_id, actor, db)
-    item = (
-        db.query(ProjectItem)
-        .filter(ProjectItem.id == item_id, ProjectItem.project_id == project_id)
-        .first()
-    )
-    if not item:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
-    tpl = templates_svc.save_subtree_as_template(
-        db,
-        source=item,
-        company_id=project.company_id,
-        name=body.name,
-        code=body.code,
-        description=body.description,
-    )
-    return templates_svc.serialize_detail(tpl, db)
 
 
 @router.post("/reorder", status_code=status.HTTP_204_NO_CONTENT)
@@ -240,40 +223,3 @@ def reorder_project_items(
     _get_project_for_write(project_id, actor, db)
     svc.reorder_children(db, project_id, body.parent_id, body.ids)
     db.commit()
-
-
-@router.post(
-    "/apply-template",
-    response_model=list[ProjectItemNode],
-    status_code=status.HTTP_201_CREATED,
-)
-def apply_template_to_project(
-    project_id: int,
-    body: ApplyTemplateRequest,
-    db: Session = Depends(get_db),
-    actor: User = Depends(require_company_admin),
-):
-    project = _get_project_for_write(project_id, actor, db)
-    template = db.query(Template).filter(Template.id == body.template_id).first()
-    if not template:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Template not found")
-    if body.parent_id is not None:
-        parent = (
-            db.query(ProjectItem)
-            .filter(ProjectItem.id == body.parent_id)
-            .first()
-        )
-        if not parent or parent.project_id != project_id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Parent must belong to this project",
-            )
-    svc.apply_template(
-        db,
-        template=template,
-        company_id=project.company_id,
-        project_id=project_id,
-        parent_id=body.parent_id,
-    )
-    db.commit()
-    return svc.get_tree(db, project_id)

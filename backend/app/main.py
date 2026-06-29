@@ -8,15 +8,12 @@ from .api import (
     companies,
     company_professionals,
     dashboard,
-    entity_types,
     health,
     locations,
     malfunctions,
     professionals,
     project_items,
     projects,
-    sale_units,
-    templates,
     users,
 )
 
@@ -47,13 +44,9 @@ def create_app() -> FastAPI:
     app.include_router(companies.router)
     app.include_router(users.router)
     app.include_router(projects.router)
-    app.include_router(sale_units.router)
     app.include_router(locations.router)
-    app.include_router(locations.system_router)
-    app.include_router(entity_types.router)
     app.include_router(professionals.router)
     app.include_router(company_professionals.router)
-    app.include_router(templates.router)
     app.include_router(project_items.router)
     app.include_router(malfunctions.router)
     return app

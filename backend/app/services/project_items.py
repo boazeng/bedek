@@ -1,4 +1,9 @@
-"""Project tree orchestration: load, serialize, apply templates."""
+"""Project tree orchestration for the Building → Entrance → Floor → Unit model.
+
+Single self-referential `project_items` table. The leaf `unit` is the sale
+unit (יחידת ממכר) and carries `unit_type`. Hierarchical numbers (e.g.
+`P00001-B01-E01-F02`) are computed on the fly from sort_order.
+"""
 from __future__ import annotations
 
 from collections import defaultdict
@@ -8,33 +13,36 @@ from fastapi import HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from ..models import (
-    EntityType,
-    ProjectItem,
-    ProjectItemKind,
-    Template,
-    TemplateItem,
-    TemplateItemKind,
-)
+from ..models import ProjectItem, ProjectItemKind, SaleUnitType
 from ..schemas.project_item import ProjectItemNode
 
 
 # ---------- Hierarchical numbering ----------
 
-# Letter prefix per kind in the hierarchical number (locations are just numeric,
-# e.g. "...-U01-01" for the first location of unit 1). Floors contain
-# apartments + public locations directly — there are no container units, so
-# `unit` always maps to U.
+# Letter prefix per structural kind. Units display their assigned number
+# (apartment number etc.) instead of an auto segment.
 KIND_NUMBER_PREFIX: dict[str, str] = {
     "building": "B",
+    "entrance": "E",
     "floor": "F",
-    "unit": "U",
-    "location": "",
+    "unit": "",
 }
 
+VALID_KINDS = (
+    ProjectItemKind.BUILDING,
+    ProjectItemKind.ENTRANCE,
+    ProjectItemKind.FLOOR,
+    ProjectItemKind.UNIT,
+)
 
-def _segment_prefix(kind: str) -> str:
-    return KIND_NUMBER_PREFIX.get(kind, "")
+# Hebrew label per sale-unit type, used to name new unit nodes.
+UNIT_TYPE_LABEL: dict[str, str] = {
+    SaleUnitType.APARTMENT: "דירה",
+    SaleUnitType.PARKING: "חניה",
+    SaleUnitType.STORAGE: "מחסן",
+    SaleUnitType.SHOP: "חנות",
+    SaleUnitType.PUBLIC_AREA: "ציבורי",
+}
 
 
 # ---------- Read ----------
@@ -42,9 +50,8 @@ def _segment_prefix(kind: str) -> str:
 def get_tree(db: Session, project_id: int) -> list[ProjectItemNode]:
     """Build the full nested tree for a project (top-level items + descendants).
 
-    Each node's `number` field is the auto-generated hierarchical code, e.g.
-    `P00001-B01-F01-U01-01`. Computed on the fly from sort_order so it always
-    reflects the current tree state without needing per-write updates."""
+    Each node's `number` is the auto hierarchical code, e.g. `P00001-B01-E01-F02`.
+    For units the segment is the assigned unit number when present."""
     rows = (
         db.query(ProjectItem)
         .filter(ProjectItem.project_id == project_id)
@@ -52,27 +59,9 @@ def get_tree(db: Session, project_id: int) -> list[ProjectItemNode]:
         .all()
     )
 
-    # Pre-lookup entity_type and template names so the UI doesn't need extra calls.
-    et_ids = {r.entity_type_id for r in rows if r.entity_type_id}
-    tpl_ids = {r.template_id for r in rows if r.template_id}
-    et_name: dict[int, str] = {}
-    if et_ids:
-        for i, n in db.query(EntityType.id, EntityType.name).filter(
-            EntityType.id.in_(et_ids)
-        ).all():
-            et_name[i] = n
-    tpl_name: dict[int, str] = {}
-    if tpl_ids:
-        for i, n in db.query(Template.id, Template.name).filter(
-            Template.id.in_(tpl_ids)
-        ).all():
-            tpl_name[i] = n
-
-    # Bucket by parent_id (keys are int or None for root).
     by_parent: dict[int | None, list[ProjectItem]] = defaultdict(list)
     for r in rows:
         by_parent[r.parent_id].append(r)
-    # Each bucket is already sorted by the outer ORDER BY.
 
     project_code = f"P{project_id:05d}"
 
@@ -84,27 +73,26 @@ def get_tree(db: Session, project_id: int) -> list[ProjectItemNode]:
         items = by_parent.get(parent_id, [])
         out: list[ProjectItemNode] = []
         for idx, r in enumerate(items):
-            prefix = _segment_prefix(r.kind)
-            seg = f"{prefix}{idx + 1:02d}" if prefix else f"{idx + 1:02d}"
+            prefix = KIND_NUMBER_PREFIX.get(r.kind, "")
+            if r.kind == ProjectItemKind.UNIT and r.number:
+                seg = r.number
+            elif prefix:
+                seg = f"{prefix}{idx + 1:02d}"
+            else:
+                seg = f"{idx + 1:02d}"
             full_number = f"{parent_code}-{seg}"
-            # Floor label semantics:
-            # - Floor row: its `floor` field (with name as fallback) — editable.
-            # - Building row: nothing shown; doesn't carry a floor label.
-            # - Unit/Location row: own `floor` override if set, otherwise
-            #   inherits from the nearest ancestor that has a value. Editable.
-            # Whatever a row displays, descendants inherit (so if a unit has its
-            # own override, its locations follow that; if not, they follow the
-            # floor — and changing the floor cascades automatically).
+
             if r.kind == ProjectItemKind.FLOOR:
                 effective = r.floor or r.name
                 shown_floor_name = effective
                 child_floor_name = effective
-            elif r.kind == ProjectItemKind.BUILDING:
+            elif r.kind in (ProjectItemKind.BUILDING, ProjectItemKind.ENTRANCE):
                 shown_floor_name = None
                 child_floor_name = floor_name
-            else:
+            else:  # unit
                 shown_floor_name = r.floor or floor_name
                 child_floor_name = shown_floor_name
+
             node = ProjectItemNode(
                 id=r.id,
                 project_id=r.project_id,
@@ -113,11 +101,8 @@ def get_tree(db: Session, project_id: int) -> list[ProjectItemNode]:
                 name=r.name,
                 number=full_number,
                 short_code=seg,
+                unit_type=r.unit_type,
                 direction=r.direction,
-                entity_type_id=r.entity_type_id,
-                entity_type_name=et_name.get(r.entity_type_id) if r.entity_type_id else None,
-                template_id=r.template_id,
-                template_name=tpl_name.get(r.template_id) if r.template_id else None,
                 sort_order=r.sort_order,
                 temp_apt_number=r.temp_apt_number,
                 permanent_apt_number=r.permanent_apt_number,
@@ -142,8 +127,6 @@ def _next_sort_order(db: Session, project_id: int, parent_id: int | None) -> int
         )
         .scalar()
     )
-    # NOTE: explicit None check — `current_max or -1` treats a valid 0 as falsy
-    # and would cause every new sibling to land at sort_order=0 (and collide).
     return 0 if current_max is None else current_max + 1
 
 
@@ -156,17 +139,11 @@ def create_item(
     kind: str,
     name: str,
     number: str | None = None,
+    unit_type: str | None = None,
     direction: str | None = None,
-    entity_type_id: int | None = None,
-    template_id: int | None = None,
     sort_order: int | None = None,
 ) -> ProjectItem:
-    if kind not in (
-        ProjectItemKind.BUILDING,
-        ProjectItemKind.FLOOR,
-        ProjectItemKind.UNIT,
-        ProjectItemKind.LOCATION,
-    ):
+    if kind not in VALID_KINDS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unknown kind '{kind}'"
         )
@@ -177,9 +154,8 @@ def create_item(
         kind=kind,
         name=name,
         number=number,
+        unit_type=unit_type,
         direction=direction,
-        entity_type_id=entity_type_id,
-        template_id=template_id,
         sort_order=(
             sort_order
             if sort_order is not None
@@ -197,6 +173,7 @@ def update_item(
     *,
     name: str | None = None,
     number: str | None = None,
+    unit_type: str | None = None,
     direction: str | None = None,
     floor: str | None = None,
     temp_apt_number: str | None = None,
@@ -208,6 +185,8 @@ def update_item(
         item.name = name
     if number is not None:
         item.number = number or None
+    if unit_type is not None:
+        item.unit_type = unit_type or None
     if direction is not None:
         item.direction = direction or None
     if floor is not None:
@@ -222,9 +201,6 @@ def update_item(
     if customer_name is not None:
         item.customer_name = customer_name or None
 
-    # When a floor's own floor label changes, wipe stale per-row overrides on
-    # every descendant so they re-inherit the new value. Without this, units
-    # that had ever typed their own override would stay frozen on the old value.
     if floor_changed_on_floor_row:
         descendant_ids = [i for i in collect_descendants(db, item.id) if i != item.id]
         if descendant_ids:
@@ -238,151 +214,156 @@ def update_item(
     return item
 
 
-# ---------- Apply template ----------
+# ---------- Sale units (bulk add + numbering) ----------
 
-def _kind_for_template(db: Session, t: Template) -> str:
-    """Decide which ProjectItemKind a Template instantiates as.
-
-    Priority:
-    1. The template's explicit `kind` (set by save-as-template from the source
-       project_item — survives even when the source had no entity_type).
-    2. The kind from the template's entity_type (the picked-from-catalog path).
-    3. UNIT as a safe last-resort default.
-    """
-    if t.kind:
-        return t.kind
-    if t.entity_type_id is None:
-        return ProjectItemKind.UNIT
-    et = db.query(EntityType).filter(EntityType.id == t.entity_type_id).first()
-    if not et or not et.kind:
-        return ProjectItemKind.UNIT
-    return et.kind
+def _ancestor_of_kind(db: Session, item: ProjectItem, kind: str) -> ProjectItem | None:
+    """Walk up parents until a node of `kind` is found."""
+    current = item
+    while current is not None:
+        if current.kind == kind:
+            return current
+        if current.parent_id is None:
+            return None
+        current = db.query(ProjectItem).filter(ProjectItem.id == current.parent_id).first()
+    return None
 
 
-def _template_items_sorted(db: Session, template_id: int) -> list[TemplateItem]:
-    return (
-        db.query(TemplateItem)
-        .filter(TemplateItem.template_id == template_id)
-        .order_by(TemplateItem.sort_order, TemplateItem.id)
+def _apartment_numbers_under(db: Session, root_id: int) -> list[int]:
+    """All numeric apartment numbers among descendants of `root_id`."""
+    ids = list(collect_descendants(db, root_id))
+    if not ids:
+        return []
+    rows = (
+        db.query(ProjectItem.number)
+        .filter(
+            ProjectItem.id.in_(ids),
+            ProjectItem.unit_type == SaleUnitType.APARTMENT,
+            ProjectItem.number.isnot(None),
+        )
         .all()
     )
+    nums: list[int] = []
+    for (n,) in rows:
+        try:
+            nums.append(int(n))
+        except (TypeError, ValueError):
+            continue
+    return nums
 
 
-def _instantiate_template_item(
+def bulk_add_units(
     db: Session,
     *,
     company_id: int,
     project_id: int,
-    parent_id: int | None,
-    item: TemplateItem,
-    visited: set[int],
-) -> None:
-    """Append one template item (location or template-ref) into the tree.
+    floor: ProjectItem,
+    unit_type: str,
+    count: int = 1,
+    start_number: int | None = None,
+    number: str | None = None,
+) -> list[ProjectItem]:
+    """Create sale units under a floor.
 
-    Per-instance metadata stored on the TemplateItem (direction, floor, apt
-    numbers) is restored onto the freshly created node so the apply round-trips
-    the original project state."""
-    if item.item_kind == TemplateItemKind.LOCATION:
-        for _ in range(max(1, item.quantity or 1)):
-            loc = create_item(
-                db,
-                company_id=company_id,
-                project_id=project_id,
-                parent_id=parent_id,
-                kind=ProjectItemKind.LOCATION,
-                name=item.label or item.location_name or "מיקום",
-                direction=item.direction,
-            )
-            loc.floor = item.floor
-            loc.temp_apt_number = item.temp_apt_number
-            loc.permanent_apt_number = item.permanent_apt_number
-            db.flush()
-    elif item.item_kind == TemplateItemKind.CHILD_TEMPLATE and item.child_template_id:
-        child = (
-            db.query(Template)
-            .filter(Template.id == item.child_template_id)
-            .first()
-        )
-        if not child:
-            return
-        for _ in range(max(1, item.quantity or 1)):
-            apply_template(
-                db,
-                template=child,
-                company_id=company_id,
-                project_id=project_id,
-                parent_id=parent_id,
-                visited=visited,
-                overrides={
-                    "name": item.label,
-                    "direction": item.direction,
-                    "floor": item.floor,
-                    "temp_apt_number": item.temp_apt_number,
-                    "permanent_apt_number": item.permanent_apt_number,
-                },
-            )
-
-
-def apply_template(
-    db: Session,
-    *,
-    template: Template,
-    company_id: int,
-    project_id: int,
-    parent_id: int | None,
-    visited: set[int] | None = None,
-    overrides: dict | None = None,
-) -> ProjectItem:
-    """Expand `template` into ProjectItems under `parent_id`.
-
-    Uniform behavior: create one wrapper node whose `kind` comes from the
-    template's entity_type (building/floor/unit/location), then put the
-    template's items inside.
-
-    `overrides` carries per-instance metadata (name, direction, floor, apt
-    numbers) supplied by the parent TemplateItem when this template is used
-    as a CHILD_TEMPLATE. They take precedence over the template defaults.
-    """
-    visited = visited if visited is not None else set()
-    if template.id in visited:
+    Apartments: `count` units auto-numbered continuously within the floor's
+    ENTRANCE, starting at `start_number` (or the next free number). Other
+    types: a single unit with the given `number`."""
+    if floor.kind != ProjectItemKind.FLOOR:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Template cycle detected at id {template.id}",
+            detail="Units can only be added under a floor",
         )
-    visited = visited | {template.id}
-    ov = overrides or {}
+    if unit_type not in UNIT_TYPE_LABEL:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unknown unit_type '{unit_type}'",
+        )
 
-    root_kind = _kind_for_template(db, template)
-    root = create_item(
-        db,
-        company_id=company_id,
-        project_id=project_id,
-        parent_id=parent_id,
-        kind=root_kind,
-        name=ov.get("name") or template.name,
-        direction=ov.get("direction"),
-        entity_type_id=template.entity_type_id,
-        template_id=template.id,
+    label = UNIT_TYPE_LABEL[unit_type]
+    created: list[ProjectItem] = []
+
+    if unit_type == SaleUnitType.APARTMENT:
+        entrance = _ancestor_of_kind(db, floor, ProjectItemKind.ENTRANCE)
+        if start_number is None:
+            existing = _apartment_numbers_under(db, entrance.id) if entrance else []
+            start_number = (max(existing) + 1) if existing else 1
+        for i in range(max(1, count)):
+            num = start_number + i
+            created.append(
+                create_item(
+                    db,
+                    company_id=company_id,
+                    project_id=project_id,
+                    parent_id=floor.id,
+                    kind=ProjectItemKind.UNIT,
+                    name=f"{label} {num}",
+                    number=str(num),
+                    unit_type=unit_type,
+                )
+            )
+    else:
+        disp = (number or "").strip()
+        created.append(
+            create_item(
+                db,
+                company_id=company_id,
+                project_id=project_id,
+                parent_id=floor.id,
+                kind=ProjectItemKind.UNIT,
+                name=f"{label} {disp}".strip(),
+                number=disp or None,
+                unit_type=unit_type,
+            )
+        )
+    return created
+
+
+def renumber_apartments(db: Session, project_id: int) -> int:
+    """Re-sequence apartment numbers 1..N within each entrance, in tree order.
+
+    Returns the number of apartments renumbered."""
+    rows = (
+        db.query(ProjectItem)
+        .filter(ProjectItem.project_id == project_id)
+        .order_by(ProjectItem.sort_order, ProjectItem.id)
+        .all()
     )
-    root.floor = ov.get("floor")
-    root.temp_apt_number = ov.get("temp_apt_number")
-    root.permanent_apt_number = ov.get("permanent_apt_number")
+    by_parent: dict[int | None, list[ProjectItem]] = defaultdict(list)
+    for r in rows:
+        by_parent[r.parent_id].append(r)
+    by_id = {r.id: r for r in rows}
+
+    changed = 0
+
+    def entrance_of(item: ProjectItem) -> int | None:
+        cur = item
+        while cur is not None:
+            if cur.kind == ProjectItemKind.ENTRANCE:
+                return cur.id
+            cur = by_id.get(cur.parent_id) if cur.parent_id else None
+        return None
+
+    # counter per entrance, walking the tree depth-first in sibling order
+    counters: dict[int | None, int] = defaultdict(lambda: 0)
+
+    def walk(parent_id: int | None) -> None:
+        nonlocal changed
+        for r in by_parent.get(parent_id, []):
+            if r.kind == ProjectItemKind.UNIT and r.unit_type == SaleUnitType.APARTMENT:
+                ent = entrance_of(r)
+                counters[ent] += 1
+                new_num = str(counters[ent])
+                if r.number != new_num:
+                    r.number = new_num
+                    r.name = f"{UNIT_TYPE_LABEL[SaleUnitType.APARTMENT]} {new_num}"
+                    changed += 1
+            walk(r.id)
+
+    walk(None)
     db.flush()
-
-    for ti in _template_items_sorted(db, template.id):
-        _instantiate_template_item(
-            db,
-            company_id=company_id,
-            project_id=project_id,
-            parent_id=root.id,
-            item=ti,
-            visited=visited,
-        )
-
-    return root
+    return changed
 
 
-# ---------- Reorder / Delete ----------
+# ---------- Reorder / Delete / Duplicate ----------
 
 def reorder_children(db: Session, project_id: int, parent_id: int | None, ids: list[int]) -> None:
     rows = (
@@ -401,12 +382,7 @@ def reorder_children(db: Session, project_id: int, parent_id: int | None, ids: l
 
 
 def duplicate_subtree(db: Session, source: ProjectItem) -> ProjectItem:
-    """Deep-copy `source` and all its descendants. The copy is inserted
-    DIRECTLY below the source (next sort_order under the same parent), with
-    " (עותק)" appended to the root name so it's visually distinct."""
-
-    # Shift every later sibling one slot down so the copy can take
-    # source.sort_order + 1 without collisions.
+    """Deep-copy `source` and all its descendants, inserted directly below it."""
     target_order = source.sort_order + 1
     sibling_filter = (
         ProjectItem.parent_id.is_(None)
@@ -424,8 +400,6 @@ def duplicate_subtree(db: Session, source: ProjectItem) -> ProjectItem:
     )
     db.flush()
 
-    # New root node — same kind/refs/metadata, immediately after the source,
-    # distinguishable name.
     new_root = create_item(
         db,
         company_id=source.company_id,
@@ -433,19 +407,15 @@ def duplicate_subtree(db: Session, source: ProjectItem) -> ProjectItem:
         parent_id=source.parent_id,
         kind=source.kind,
         name=f"{source.name} (עותק)",
+        number=source.number,
+        unit_type=source.unit_type,
         direction=source.direction,
-        entity_type_id=source.entity_type_id,
-        template_id=source.template_id,
         sort_order=target_order,
     )
-    # Carry over the metadata fields that create_item doesn't take. These are
-    # what makes the copy actually look like the source — floor label on a floor,
-    # apt numbers on a unit, etc.
     new_root.floor = source.floor
     new_root.temp_apt_number = source.temp_apt_number
     new_root.permanent_apt_number = source.permanent_apt_number
 
-    # DFS over descendants, preserving sibling order within each level.
     def _copy_children(old_parent_id: int, new_parent_id: int) -> None:
         children = (
             db.query(ProjectItem)
@@ -461,9 +431,9 @@ def duplicate_subtree(db: Session, source: ProjectItem) -> ProjectItem:
                 parent_id=new_parent_id,
                 kind=c.kind,
                 name=c.name,
+                number=c.number,
+                unit_type=c.unit_type,
                 direction=c.direction,
-                entity_type_id=c.entity_type_id,
-                template_id=c.template_id,
             )
             clone.floor = c.floor
             clone.temp_apt_number = c.temp_apt_number

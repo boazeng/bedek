@@ -43,7 +43,7 @@ class Malfunction(Base):
     __table_args__ = (
         Index("ix_malf_company", "company_id"),
         Index("ix_malf_project", "project_id"),
-        Index("ix_malf_unit", "sale_unit_id"),
+        Index("ix_malf_item", "project_item_id"),
         Index("ix_malf_status", "status"),
         Index("ix_malf_company_status", "company_id", "status"),
     )
@@ -55,21 +55,15 @@ class Malfunction(Base):
     project_id: Mapped[int] = mapped_column(
         ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
     )
-    sale_unit_id: Mapped[int | None] = mapped_column(
-        ForeignKey("sale_units.id", ondelete="SET NULL")
-    )
     buyer_id: Mapped[int | None] = mapped_column(
         ForeignKey("buyers.id", ondelete="SET NULL")
     )
-    delivery_protocol_id: Mapped[int | None] = mapped_column(
-        ForeignKey("delivery_protocols.id", ondelete="SET NULL")
-    )
+    # Location classification (סיווג מיקום) chosen at open-time from the
+    # per-company location catalog. No longer attached to the project tree.
     location_id: Mapped[int | None] = mapped_column(
         ForeignKey("location_catalog.id", ondelete="SET NULL")
     )
-    # New (tree-based) reference. Defects on the new project tree point to a
-    # ProjectItem (a unit or a location within a unit). The walking logic in
-    # the API rolls up children when querying "defects of unit X".
+    # The sale unit (or any tree node) this defect belongs to.
     project_item_id: Mapped[int | None] = mapped_column(
         ForeignKey("project_items.id", ondelete="SET NULL")
     )

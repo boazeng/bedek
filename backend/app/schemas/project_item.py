@@ -1,4 +1,7 @@
-"""Pydantic schemas for project tree items."""
+"""Pydantic schemas for project tree items.
+
+Tree hierarchy: building → entrance → floor → unit (sale unit).
+"""
 from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict
@@ -7,12 +10,11 @@ from pydantic import BaseModel, ConfigDict
 class ProjectItemIn(BaseModel):
     """Create/update payload for a single tree node."""
 
-    kind: str  # 'building' | 'floor' | 'unit' | 'location'
+    kind: str  # 'building' | 'entrance' | 'floor' | 'unit'
     name: str
     number: str | None = None
+    unit_type: str | None = None   # only for kind='unit'
     direction: str | None = None
-    entity_type_id: int | None = None
-    template_id: int | None = None
     parent_id: int | None = None
 
 
@@ -21,6 +23,7 @@ class ProjectItemUpdate(BaseModel):
 
     name: str | None = None
     number: str | None = None
+    unit_type: str | None = None
     direction: str | None = None
     floor: str | None = None
     temp_apt_number: str | None = None
@@ -38,28 +41,33 @@ class ProjectItemNode(BaseModel):
     parent_id: int | None
     kind: str
     name: str
-    number: str | None         # full hierarchical code, e.g. P00001-B01-F02-U01-01
+    number: str | None         # full hierarchical code, e.g. P00001-B01-E01-F02
     short_code: str | None = None   # just the segment for this level, e.g. F02
+    unit_type: str | None = None    # sale-unit type (kind='unit' only)
     direction: str | None
-    entity_type_id: int | None
-    entity_type_name: str | None = None
-    template_id: int | None
-    template_name: str | None = None
     sort_order: int
     # Apartment-specific (kind=unit). Editable inline in the project tree UI.
     temp_apt_number: str | None = None
     permanent_apt_number: str | None = None
     # Free-text customer label shown next to the row name.
     customer_name: str | None = None
-    # Name of the nearest FLOOR ancestor (None for buildings + floors themselves).
-    # Derived during tree build — not stored.
+    # Name of the nearest FLOOR ancestor (None for buildings/entrances/floors).
     floor_name: str | None = None
     children: list["ProjectItemNode"] = []
 
 
-class ApplyTemplateRequest(BaseModel):
-    template_id: int
-    parent_id: int | None = None  # null = add at project root
+class BulkAddUnitsRequest(BaseModel):
+    """Add sale units under a floor.
+
+    For apartments: `count` units are created, auto-numbered continuously
+    within the floor's entrance starting at `start_number` (or the next free
+    number if omitted). For other types: a single unit with `number`.
+    """
+
+    unit_type: str
+    count: int = 1
+    start_number: int | None = None   # apartments: explicit start; else ignored
+    number: str | None = None         # non-apartment: the assigned number
 
 
 class DuplicateResponse(BaseModel):

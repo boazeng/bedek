@@ -22,16 +22,10 @@ const LINKS: AdminLink[] = [
     description: 'ניהול משתמשי החברה — אדמין, מפקחים, דיירים',
   },
   {
-    key: 'company_templates',
-    label: 'תבניות חברה',
-    icon: 'copy',
-    description: 'תבניות שמורות של החברה לבניית בניינים, קומות ודירות',
-  },
-  {
     key: 'locations',
     label: 'מיקומים של החברה',
     icon: 'layout',
-    description: 'קטלוג מיקומים פר חברה (סלון, מטבח, לובי קומתי וכו\')',
+    description: 'קטלוג מיקומי הליקויים (סלון, מטבח, לובי קומתי…) — נבחר בעת פתיחת תקלה',
   },
   {
     key: 'company_professionals',

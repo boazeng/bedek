@@ -143,13 +143,13 @@ def allowed_project_ids_for(user: User, db: Session) -> list[int] | None:
             .all()
         )
         return [r[0] for r in rows]
-    # end_customer → projects derived from their units
+    # end_customer → projects derived from defects linked to their buyer
     if user.role == UserRole.END_CUSTOMER:
-        from .models import SaleUnit
+        from .models import Malfunction
 
         rows = (
-            db.query(SaleUnit.project_id)
-            .filter(SaleUnit.buyer_id == user.buyer_id)
+            db.query(Malfunction.project_id)
+            .filter(Malfunction.buyer_id == user.buyer_id)
             .distinct()
             .all()
         )

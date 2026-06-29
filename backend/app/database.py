@@ -32,23 +32,14 @@ def get_db():
 # Run after `Base.metadata.create_all()` to add new columns to existing tables
 # without dropping data. Safe to run repeatedly (column-existence check).
 _INPLACE_COLUMN_MIGRATIONS: list[tuple[str, str, str]] = [
-    ("templates", "code", "VARCHAR(60)"),
-    ("templates", "format", "VARCHAR(40) NOT NULL DEFAULT 'simple'"),
-    ("templates", "sort_order", "INTEGER NOT NULL DEFAULT 0"),
-    ("template_items", "floor", "VARCHAR(20)"),
     ("malfunctions", "project_item_id", "INTEGER"),
     ("malfunctions", "professional", "VARCHAR(200)"),
-    ("entity_types", "kind", "VARCHAR(20) NOT NULL DEFAULT 'unit'"),
+    ("malfunctions", "location_id", "INTEGER"),
+    ("project_items", "unit_type", "VARCHAR(30)"),
     ("project_items", "temp_apt_number", "VARCHAR(40)"),
     ("project_items", "permanent_apt_number", "VARCHAR(40)"),
     ("project_items", "floor", "VARCHAR(40)"),
     ("project_items", "customer_name", "VARCHAR(200)"),
-    ("templates", "company_id", "INTEGER"),
-    ("templates", "is_internal", "BOOLEAN NOT NULL DEFAULT 0"),
-    ("templates", "kind", "VARCHAR(20)"),
-    ("template_items", "direction", "VARCHAR(20)"),
-    ("template_items", "temp_apt_number", "VARCHAR(40)"),
-    ("template_items", "permanent_apt_number", "VARCHAR(40)"),
 ]
 
 

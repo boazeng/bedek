@@ -1,5 +1,5 @@
 """Seed the database with a super-admin + 2 demo companies, each with users,
-projects, units and defects. Run from the backend folder:
+projects (building → entrance → floor → unit) and defects. Run from backend:
 
     python -m app.seed
 """
@@ -9,64 +9,24 @@ import random
 from datetime import date, timedelta
 
 from .database import Base, SessionLocal, engine
-from sqlalchemy import func
 
 from .models import (
     Company,
-    EntityType,
     Project,
-    Buyer,
-    SaleUnit,
+    ProjectItem,
+    ProjectItemKind,
     SaleUnitType,
+    Buyer,
     LocationCatalog,
     Malfunction,
     MalfunctionStatus,
     MalfunctionSource,
     MalfunctionGroup,
     Professional,
-    SystemLocation,
     User,
     UserRole,
     UserProjectAccess,
 )
-
-
-DEFAULT_ENTITY_TYPES = [
-    # (name, code, kind) — kind defines what ProjectItem kind a template of
-    # this entity type creates when applied.
-    ("מבנה מגורים", "residential_building", "building"),
-    ("מבנה משרדים", "office_building", "building"),
-    ("מבנה מסחרי", "commercial_building", "building"),
-    ("קומה", "floor", "floor"),
-    ("דירה", "apartment", "unit"),
-    ("שטחי ציבור", "public_areas", "unit"),
-    ("חניון", "parking_lot", "unit"),
-    ("גינה", "garden", "unit"),
-    ("מסחרי", "commercial", "unit"),
-    ("חנות", "shop", "unit"),
-]
-
-
-def _ensure_entity_types(db) -> None:
-    """Idempotent: insert any missing default entity types, preserving order."""
-    existing_codes = {
-        row.code for row in db.query(EntityType).all() if row.code is not None
-    }
-    next_order = db.query(EntityType).count()
-    for name, code, kind in DEFAULT_ENTITY_TYPES:
-        if code in existing_codes:
-            continue
-        db.add(
-            EntityType(
-                name=name,
-                code=code,
-                kind=kind,
-                sort_order=next_order,
-                is_active=True,
-            )
-        )
-        next_order += 1
-    db.commit()
 
 
 DEFAULT_PROFESSIONALS = [
@@ -92,63 +52,6 @@ def _ensure_professionals(db) -> None:
     db.commit()
 
 
-def _ensure_system_locations(db) -> None:
-    """Populate the system_locations table on first run.
-
-    Seeds from the company with the largest, most-organized location catalog
-    (so the user's manual ordering carries over). Falls back to DEFAULT_LOCATIONS
-    if no per-company catalogs exist yet. Idempotent."""
-    if db.query(SystemLocation).first():
-        return
-
-    # Pick the company with the most location_catalog rows — assume it's the
-    # most representative of the user's intent.
-    top = (
-        db.query(LocationCatalog.company_id, func.count(LocationCatalog.id).label("c"))
-        .group_by(LocationCatalog.company_id)
-        .order_by(func.count(LocationCatalog.id).desc())
-        .first()
-    )
-
-    order: list[str] = []
-    seen: set[str] = set()
-
-    if top:
-        primary_cid = top[0]
-        primary_rows = (
-            db.query(LocationCatalog.name)
-            .filter(LocationCatalog.company_id == primary_cid)
-            .order_by(LocationCatalog.sort_order)
-            .all()
-        )
-        for (n,) in primary_rows:
-            if n not in seen:
-                seen.add(n)
-                order.append(n)
-        # Add stragglers from other companies, sorted alphabetically.
-        extras = (
-            db.query(LocationCatalog.name)
-            .filter(LocationCatalog.company_id != primary_cid)
-            .distinct()
-            .order_by(LocationCatalog.name)
-            .all()
-        )
-        for (n,) in extras:
-            if n not in seen:
-                seen.add(n)
-                order.append(n)
-    else:
-        # No companies have a catalog yet — start from the bundled defaults.
-        for n, _ in DEFAULT_LOCATIONS:
-            if n not in seen:
-                seen.add(n)
-                order.append(n)
-
-    for idx, name in enumerate(order):
-        db.add(SystemLocation(name=name, sort_order=idx, is_active=True))
-    db.commit()
-
-
 DEFAULT_LOCATIONS = [
     ("סלון", False),
     ("מטבח", False),
@@ -166,6 +69,63 @@ DEFAULT_LOCATIONS = [
 ]
 
 
+def _build_project_tree(db, company_id: int, project_id: int) -> list[ProjectItem]:
+    """Create a building → entrance → floor → unit tree. Returns the leaf units.
+
+    Two buildings, each with one entrance, 3 floors, 2 apartments per floor
+    (auto-numbered 1..N per entrance), plus a parking unit on the ground floor.
+    """
+    units: list[ProjectItem] = []
+
+    def add(parent_id, kind, name, *, number=None, unit_type=None, sort_order):
+        item = ProjectItem(
+            company_id=company_id,
+            project_id=project_id,
+            parent_id=parent_id,
+            kind=kind,
+            name=name,
+            number=number,
+            unit_type=unit_type,
+            sort_order=sort_order,
+        )
+        db.add(item)
+        db.flush()
+        return item
+
+    for b_idx in range(2):
+        building = add(None, ProjectItemKind.BUILDING, f"בניין {b_idx + 1}", sort_order=b_idx)
+        entrance = add(building.id, ProjectItemKind.ENTRANCE, "כניסה א", sort_order=0)
+        apt_counter = 0
+        for f_idx in range(3):
+            floor = add(
+                entrance.id, ProjectItemKind.FLOOR, f"קומה {f_idx + 1}", sort_order=f_idx
+            )
+            if f_idx == 0:
+                units.append(
+                    add(
+                        floor.id,
+                        ProjectItemKind.UNIT,
+                        "חניה 1",
+                        number="1",
+                        unit_type=SaleUnitType.PARKING,
+                        sort_order=0,
+                    )
+                )
+            for a in range(2):
+                apt_counter += 1
+                units.append(
+                    add(
+                        floor.id,
+                        ProjectItemKind.UNIT,
+                        f"דירה {apt_counter}",
+                        number=str(apt_counter),
+                        unit_type=SaleUnitType.APARTMENT,
+                        sort_order=a + 1,
+                    )
+                )
+    return units
+
+
 def _seed_one_company(
     db, slug: str, name: str, projects_data: list[tuple[str, str]]
 ) -> Company:
@@ -178,15 +138,16 @@ def _seed_one_company(
     db.add(company)
     db.flush()
 
+    locations: list[LocationCatalog] = []
     for i, (loc_name, public_only) in enumerate(DEFAULT_LOCATIONS):
-        db.add(
-            LocationCatalog(
-                company_id=company.id,
-                name=loc_name,
-                applies_to_public_only=public_only,
-                sort_order=i,
-            )
+        loc = LocationCatalog(
+            company_id=company.id,
+            name=loc_name,
+            applies_to_public_only=public_only,
+            sort_order=i,
         )
+        db.add(loc)
+        locations.append(loc)
 
     projects: list[Project] = []
     for p_name, address in projects_data:
@@ -217,20 +178,9 @@ def _seed_one_company(
         buyers.append(b)
     db.flush()
 
-    units: list[SaleUnit] = []
+    units_by_project: dict[int, list[ProjectItem]] = {}
     for proj in projects:
-        for u_idx in range(1, 9):
-            u = SaleUnit(
-                company_id=company.id,
-                project_id=proj.id,
-                unit_type=SaleUnitType.APARTMENT,
-                unit_number=str(u_idx),
-                entrance="א",
-                floor=str((u_idx + 1) // 2),
-                buyer_id=random.choice(buyers).id,
-            )
-            db.add(u)
-            units.append(u)
+        units_by_project[proj.id] = _build_project_tree(db, company.id, proj.id)
     db.flush()
 
     statuses_distribution = (
@@ -258,7 +208,7 @@ def _seed_one_company(
     today = date.today()
     for proj in projects:
         n_defects = random.randint(15, 28)
-        proj_units = [u for u in units if u.project_id == proj.id]
+        proj_units = units_by_project[proj.id]
         for _ in range(n_defects):
             status_v = random.choice(statuses_distribution)
             opened = today - timedelta(days=random.randint(0, 120))
@@ -270,8 +220,9 @@ def _seed_one_company(
                 Malfunction(
                     company_id=company.id,
                     project_id=proj.id,
-                    sale_unit_id=unit.id,
-                    buyer_id=unit.buyer_id,
+                    project_item_id=unit.id,
+                    location_id=random.choice(locations).id,
+                    buyer_id=random.choice(buyers).id,
                     status=status_v,
                     source=random.choice(sources),
                     group=random.choice(groups),
@@ -319,10 +270,8 @@ def seed():
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:
-        # System-wide tables are always kept in sync (idempotent).
-        _ensure_entity_types(db)
+        # System-wide catalogs are always kept in sync (idempotent).
         _ensure_professionals(db)
-        _ensure_system_locations(db)
 
         if db.query(User).filter(User.role == UserRole.SUPER_ADMIN).first():
             print("Already seeded (system tables refreshed); skipping the rest.")

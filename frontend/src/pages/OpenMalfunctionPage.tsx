@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
+  CompanyProfessionals,
+  Locations,
   Malfunctions,
   Projects,
   ProjectTree,
+  type CompanyProfessionalRow,
+  type LocationRow,
   type Project,
   type ProjectItemNode,
 } from '../lib/api'
@@ -97,9 +101,9 @@ function flattenTree(tree: ProjectItemNode[]): FlatRow[] {
 
 const KIND_ICON: Record<string, string> = {
   building: '🏢',
+  entrance: '🚪',
   floor: '🏬',
   unit: '🏠',
-  location: '📍',
 }
 
 export default function OpenMalfunctionPage() {
@@ -116,6 +120,9 @@ export default function OpenMalfunctionPage() {
   const [error, setError] = useState<string | null>(null)
 
   const [projectItemId, setProjectItemId] = useState<number | null>(null)
+  const [locationId, setLocationId] = useState<number | null>(null)
+  const [locations, setLocations] = useState<LocationRow[]>([])
+  const [trades, setTrades] = useState<CompanyProfessionalRow[]>([])
   const [description, setDescription] = useState('')
   const [group, setGroup] = useState('unassigned')
   const [status, setStatus] = useState('pending_manager')
@@ -126,12 +133,19 @@ export default function OpenMalfunctionPage() {
 
   useEffect(() => {
     if (needsCompany) return
-    Projects.list(user?.role === 'super_admin' ? companyId ?? undefined : undefined)
+    const cid = user?.role === 'super_admin' ? companyId ?? undefined : undefined
+    Projects.list(cid)
       .then((p) => {
         setProjects(p)
         if (p.length && !projectId) setProjectId(p[0].id)
       })
       .catch((e) => setError(String(e)))
+    Locations.list(cid)
+      .then(setLocations)
+      .catch(() => setLocations([]))
+    CompanyProfessionals.list(cid)
+      .then((rows) => setTrades(rows.filter((r) => r.is_active)))
+      .catch(() => setTrades([]))
   }, [user?.role, companyId])
 
   useEffect(() => {
@@ -160,6 +174,7 @@ export default function OpenMalfunctionPage() {
     setProfessional('')
     setOpenedAt(today)
     setProjectItemId(null)
+    setLocationId(null)
   }
 
   async function submit() {
@@ -176,6 +191,7 @@ export default function OpenMalfunctionPage() {
       await Malfunctions.create({
         project_id: projectId,
         project_item_id: projectItemId,
+        location_id: locationId,
         description: description.trim(),
         status,
         source,
@@ -264,6 +280,24 @@ export default function OpenMalfunctionPage() {
           )}
         </Field>
 
+        <Field
+          label="מיקום (סיווג)"
+          hint="מיקום הליקוי בתוך היחידה (סלון, מטבח…). מנוהל תחת ניהול חברה ← מיקומים של החברה."
+        >
+          <select
+            style={strongInputStyle}
+            value={locationId ?? ''}
+            onChange={(e) => setLocationId(e.target.value ? Number(e.target.value) : null)}
+          >
+            <option value="">— ללא מיקום —</option>
+            {locations.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+
         <Field label="תיאור התקלה">
           <textarea
             style={{ ...strongInputStyle, minHeight: 90, resize: 'vertical' }}
@@ -296,12 +330,18 @@ export default function OpenMalfunctionPage() {
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <Field label="בעל מקצוע">
-            <input
+            <select
               style={strongInputStyle}
               value={professional}
               onChange={(e) => setProfessional(e.target.value)}
-              placeholder="חשמלאי / אינסטלטור / ..."
-            />
+            >
+              <option value="">— ללא —</option>
+              {trades.map((t) => (
+                <option key={t.id} value={t.name}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
           </Field>
           <Field label="מקור">
             <select style={strongInputStyle} value={source} onChange={(e) => setSource(e.target.value)}>

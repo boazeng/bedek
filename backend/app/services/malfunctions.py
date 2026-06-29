@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from ..models import (
     Buyer,
+    LocationCatalog,
     Malfunction,
     MalfunctionActivity,
     MalfunctionStatus,
@@ -250,6 +251,7 @@ def list_defects_for_unit(
         .order_by(Malfunction.opened_at.desc())
         .all()
     )
+    loc_name = _location_names(db, [d.location_id for d in defects])
     return [
         MalfunctionListItem(
             id=d.id,
@@ -259,6 +261,8 @@ def list_defects_for_unit(
                 if d.project_item_id and d.project_item_id in items_by_id
                 else None
             ),
+            location_id=d.location_id,
+            location_name=loc_name.get(d.location_id) if d.location_id else None,
             status=d.status,
             source=d.source,
             group=d.group,
@@ -269,6 +273,19 @@ def list_defects_for_unit(
         )
         for d in defects
     ]
+
+
+def _location_names(db: Session, ids: list[int | None]) -> dict[int, str]:
+    """Batch-resolve LocationCatalog id → name."""
+    wanted = {i for i in ids if i}
+    if not wanted:
+        return {}
+    return {
+        i: n
+        for i, n in db.query(LocationCatalog.id, LocationCatalog.name)
+        .filter(LocationCatalog.id.in_(wanted))
+        .all()
+    }
 
 
 def get_defect(db: Session, defect_id: int) -> MalfunctionDetail | None:
@@ -282,6 +299,7 @@ def get_defect(db: Session, defect_id: int) -> MalfunctionDetail | None:
             .filter(ProjectItem.id == d.project_item_id)
             .first()
         )
+    location_name = _location_names(db, [d.location_id]).get(d.location_id)
     acts = (
         db.query(MalfunctionActivity)
         .filter(MalfunctionActivity.malfunction_id == defect_id)
@@ -294,6 +312,8 @@ def get_defect(db: Session, defect_id: int) -> MalfunctionDetail | None:
         project_item_id=d.project_item_id,
         project_item_name=item.name if item else None,
         project_item_number=item.number if item else None,
+        location_id=d.location_id,
+        location_name=location_name,
         status=d.status,
         source=d.source,
         group=d.group,
