@@ -6,6 +6,7 @@ import LoginPage from './LoginPage'
 import TactLogo from '../components/TactLogo'
 import BuildingNode from '../components/builder/BuildingNode'
 import UnitPalette from '../components/builder/UnitPalette'
+import type { CollapseCmd } from '../components/builder/shared'
 
 type Props = { projectId: number }
 
@@ -18,6 +19,7 @@ export default function ProjectEditorPage({ projectId }: Props) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [collapseCmd, setCollapseCmd] = useState<CollapseCmd>({ all: false, n: 0 })
 
   function load(silent = false) {
     if (!silent) setLoading(true)
@@ -147,12 +149,27 @@ export default function ProjectEditorPage({ projectId }: Props) {
 
         {/* Main column — actions + structure tree. */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
+          <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
             <button className="tact-btn tact-btn-primary" onClick={addBuilding} disabled={busy}>
               + בניין
             </button>
             <button className="tact-btn tact-btn-ghost" onClick={renumber} disabled={busy || tree.length === 0}>
               מספור דירות מחדש
+            </button>
+            <span style={{ flex: 1 }} />
+            <button
+              className="tact-btn tact-btn-ghost"
+              onClick={() => setCollapseCmd((c) => ({ all: true, n: c.n + 1 }))}
+              disabled={tree.length === 0}
+            >
+              כווץ הכל
+            </button>
+            <button
+              className="tact-btn tact-btn-ghost"
+              onClick={() => setCollapseCmd((c) => ({ all: false, n: c.n + 1 }))}
+              disabled={tree.length === 0}
+            >
+              הרחב הכל
             </button>
           </div>
 
@@ -184,6 +201,7 @@ export default function ProjectEditorPage({ projectId }: Props) {
                 building={b}
                 onRefresh={refresh}
                 onConfirmDelete={confirmDelete}
+                collapseCmd={collapseCmd}
               />
             ))
           )}

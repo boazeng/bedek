@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react'
 import type { SaleUnitType } from '../../lib/api'
 
+/** Broadcast "collapse all / expand all" command. `n` bumps on every click so
+ *  floors re-apply `all` even if its value is unchanged. */
+export type CollapseCmd = { all: boolean; n: number }
+
 export const UNIT_TYPE_OPTIONS: { value: SaleUnitType; label: string }[] = [
   { value: 'apartment', label: 'דירה' },
   { value: 'parking', label: 'חניה' },

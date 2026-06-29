@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ProjectTree, type BulkAddUnitsPayload, type ProjectItemNode } from '../../lib/api'
-import { EditableText, MiniBtn, UNIT_TYPE_LABEL } from './shared'
+import { EditableText, MiniBtn, UNIT_TYPE_LABEL, type CollapseCmd } from './shared'
 import AddUnitsModal from './AddUnitsModal'
 import { UNIT_DRAG_TYPE } from './UnitPalette'
 
@@ -9,13 +9,19 @@ type Props = {
   floor: ProjectItemNode
   onRefresh: () => void
   onConfirmDelete: (label: string) => Promise<boolean>
+  collapseCmd?: CollapseCmd
 }
 
-export default function FloorNode({ projectId, floor, onRefresh, onConfirmDelete }: Props) {
+export default function FloorNode({ projectId, floor, onRefresh, onConfirmDelete, collapseCmd }: Props) {
   const [addOpen, setAddOpen] = useState(false)
   const [dragOver, setDragOver] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
   const units = floor.children
+
+  // Apply a "collapse all / expand all" broadcast from the toolbar.
+  useEffect(() => {
+    if (collapseCmd) setCollapsed(collapseCmd.all)
+  }, [collapseCmd?.n])
 
   async function rename(next: string) {
     await ProjectTree.update(projectId, floor.id, { name: next })

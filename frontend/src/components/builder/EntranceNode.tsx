@@ -1,5 +1,5 @@
 import { ProjectTree, type ProjectItemNode } from '../../lib/api'
-import { EditableText, MiniBtn } from './shared'
+import { EditableText, MiniBtn, type CollapseCmd } from './shared'
 import FloorNode from './FloorNode'
 
 type Props = {
@@ -7,9 +7,10 @@ type Props = {
   entrance: ProjectItemNode
   onRefresh: () => void
   onConfirmDelete: (label: string) => Promise<boolean>
+  collapseCmd?: CollapseCmd
 }
 
-export default function EntranceNode({ projectId, entrance, onRefresh, onConfirmDelete }: Props) {
+export default function EntranceNode({ projectId, entrance, onRefresh, onConfirmDelete, collapseCmd }: Props) {
   const floors = entrance.children
 
   async function rename(next: string) {
@@ -97,6 +98,7 @@ export default function EntranceNode({ projectId, entrance, onRefresh, onConfirm
               floor={f}
               onRefresh={onRefresh}
               onConfirmDelete={onConfirmDelete}
+              collapseCmd={collapseCmd}
             />
           ))
         )}
