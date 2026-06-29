@@ -95,7 +95,7 @@ const UNIT_TYPE_LABEL: Record<string, string> = {
 }
 
 export default function OpenMalfunctionPage() {
-  const { user, activeProject } = useAuth()
+  const { user, activeProject, workScope } = useAuth()
   const companyId = useEffectiveCompanyId()
   const alert = useAlert()
   const today = new Date().toISOString().slice(0, 10)
@@ -154,9 +154,16 @@ export default function OpenMalfunctionPage() {
     ProjectTree.list(projectId)
       .then((t) => {
         setTree(t)
-        setBuildingId(null)
-        setEntranceId(null)
-        setUnitId(null)
+        // Prefill from the global work scope when it matches this project.
+        if (activeProject && projectId === activeProject.id && workScope.buildingId) {
+          setBuildingId(workScope.buildingId)
+          setEntranceId(workScope.entranceId)
+          setUnitId(workScope.unitId)
+        } else {
+          setBuildingId(null)
+          setEntranceId(null)
+          setUnitId(null)
+        }
       })
       .catch((e) => setError(String(e)))
       .finally(() => setLoadingTree(false))
