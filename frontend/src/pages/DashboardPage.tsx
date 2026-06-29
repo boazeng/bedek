@@ -61,7 +61,7 @@ export default function DashboardPage() {
         style={{ marginBottom: 30 }}
       >
         <KpiCard label="פרויקטים" value={company.total_projects} />
-        <KpiCard label="יחידות ממכר" value={company.total_units} />
+        <KpiCard label="מספר דירות" value={company.total_units} />
         <KpiCard
           label="סה״כ ליקויים"
           value={company.total_defects}

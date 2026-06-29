@@ -14,6 +14,7 @@ from ..models import (
     Project,
     ProjectItem,
     ProjectItemKind,
+    SaleUnitType,
     Malfunction,
     MalfunctionStatus,
     MalfunctionSource,
@@ -173,8 +174,11 @@ def get_dashboard(
         .scalar()
         or 0
     )
-    unit_filter = (ProjectItem.company_id == company.id) & (
-        ProjectItem.kind == ProjectItemKind.UNIT
+    # Count apartments only (not parking/storage/shop/public).
+    unit_filter = (
+        (ProjectItem.company_id == company.id)
+        & (ProjectItem.kind == ProjectItemKind.UNIT)
+        & (ProjectItem.unit_type == SaleUnitType.APARTMENT)
     )
     if allowed_ids is not None:
         unit_filter = unit_filter & ProjectItem.project_id.in_(allowed_ids)
