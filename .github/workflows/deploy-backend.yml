@@ -71,3 +71,18 @@ jobs:
               CrmServiceKey="$CRM_SERVICE_KEY" \
               DomainName=${{ vars.DOMAIN_NAME }} \
               AcmCertificateArn=${{ vars.ACM_CERTIFICATE_ARN }}
+
+      - name: Apply DB migrations (invoke cmm-bedek-migrate)
+        # The API Lambda runs with lifespan="off", so it never applies schema
+        # migrations itself. Invoke the migrate function after every deploy so new
+        # columns/tables are added (and the super_admin ensured). Idempotent.
+        run: |
+          aws lambda invoke \
+            --function-name cmm-bedek-migrate \
+            --region "${{ vars.AWS_REGION }}" \
+            /tmp/migrate-out.json > /tmp/migrate-meta.json
+          echo "invoke metadata:"; cat /tmp/migrate-meta.json; echo
+          echo "function response:"; cat /tmp/migrate-out.json; echo
+          if grep -q '"FunctionError"' /tmp/migrate-meta.json; then
+            echo "::error::cmm-bedek-migrate reported an error"; exit 1
+          fi
