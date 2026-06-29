@@ -11,6 +11,7 @@ class CompanyIn(BaseModel):
     contact_email: str | None = None
     phone: str | None = None
     is_active: bool = True
+    crm_company_id: int | None = None   # link to the matching tenant in TACT-CRM
 
 
 class CompanyOut(BaseModel):
@@ -22,6 +23,7 @@ class CompanyOut(BaseModel):
     contact_email: str | None
     phone: str | None
     is_active: bool
+    crm_company_id: int | None
     created_at: datetime
 
 

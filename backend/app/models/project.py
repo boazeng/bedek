@@ -20,6 +20,9 @@ class Project(Base):
     address: Mapped[str | None] = mapped_column(String(300))
     project_manager: Mapped[str | None] = mapped_column(String(200))
     site_manager: Mapped[str | None] = mapped_column(String(200))
+    # When set, this project was imported (read-only header) from TACT-CRM. The
+    # value is the CRM real-estate project id; used to de-dupe on re-sync.
+    crm_external_id: Mapped[str | None] = mapped_column(String(60))
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, nullable=False
     )

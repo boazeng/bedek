@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import String, DateTime, Boolean
+from sqlalchemy import String, DateTime, Boolean, Integer
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..database import Base
@@ -17,6 +17,9 @@ class Company(Base):
     contact_email: Mapped[str | None] = mapped_column(String(200))
     phone: Mapped[str | None] = mapped_column(String(40))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # Link to the matching tenant in TACT-CRM (one-time mapping). When set, this
+    # company's bedek (real-estate) projects are synced from CRM.
+    crm_company_id: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, nullable=False
     )

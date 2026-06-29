@@ -32,6 +32,8 @@ def get_db():
 # Run after `Base.metadata.create_all()` to add new columns to existing tables
 # without dropping data. Safe to run repeatedly (column-existence check).
 _INPLACE_COLUMN_MIGRATIONS: list[tuple[str, str, str]] = [
+    ("companies", "crm_company_id", "INTEGER"),
+    ("projects", "crm_external_id", "VARCHAR(60)"),
     ("malfunctions", "project_item_id", "INTEGER"),
     ("malfunctions", "professional", "VARCHAR(200)"),
     ("malfunctions", "location_id", "INTEGER"),

@@ -7,6 +7,7 @@ from .api import (
     auth,
     companies,
     company_professionals,
+    crm,
     dashboard,
     health,
     locations,
@@ -47,6 +48,7 @@ def create_app() -> FastAPI:
     app.include_router(locations.router)
     app.include_router(professionals.router)
     app.include_router(company_professionals.router)
+    app.include_router(crm.router)
     app.include_router(project_items.router)
     app.include_router(malfunctions.router)
     return app

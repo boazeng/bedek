@@ -30,6 +30,15 @@ class Settings(BaseSettings):
     # verifying Google ID tokens from the browser. Empty = Google login disabled.
     google_client_id: str = ""
 
+    # --- TACT-CRM integration (read-only sync of companies' projects + customers) ---
+    # Base URL of the CRM service API. The /api/service/* surface is authenticated
+    # by the shared service secret below and scoped per call by company_id.
+    crm_base_url: str = "https://crm-db.newavera.co.il"
+    # Shared service secret (matches CRM's SERVICE_API_KEY). Lives only server-side
+    # — injected via env in dev, from SSM/Secrets Manager in prod. Empty = the CRM
+    # integration is disabled.
+    crm_service_key: str = ""
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]

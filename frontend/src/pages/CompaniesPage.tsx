@@ -12,6 +12,7 @@ const EMPTY_FORM: FormState = {
   contact_email: '',
   phone: '',
   is_active: true,
+  crm_company_id: null,
 }
 
 export default function CompaniesPage() {
@@ -47,6 +48,7 @@ export default function CompaniesPage() {
       contact_email: c.contact_email || '',
       phone: c.phone || '',
       is_active: c.is_active,
+      crm_company_id: c.crm_company_id ?? null,
     })
     setSaveErr(null)
     setOpen(true)
@@ -180,6 +182,20 @@ export default function CompaniesPage() {
             />
             <span style={{ fontSize: '0.9rem' }}>פעיל</span>
           </label>
+        </Field>
+        <Field
+          label="מזהה חברה ב-CRM"
+          hint="הקישור ל-TACT-CRM. כשמוגדר — אפשר לסנכרן את פרויקטי הבדק של החברה מ-CRM. ריק = אין קישור."
+        >
+          <input
+            type="number"
+            style={inputStyle}
+            value={form.crm_company_id ?? ''}
+            onChange={(e) =>
+              setForm({ ...form, crm_company_id: e.target.value ? Number(e.target.value) : null })
+            }
+            placeholder="למשל: 2"
+          />
         </Field>
         {saveErr && <div style={{ color: 'var(--color-accent)' }}>{saveErr}</div>}
       </Modal>

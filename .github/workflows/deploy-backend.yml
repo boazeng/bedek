@@ -45,6 +45,11 @@ jobs:
       - name: SAM build & deploy
         working-directory: infra
         run: |
+          # CRM service secret: single source of truth is SSM (set by the CRM-DB
+          # stack). Read it at deploy time so it's never duplicated in GitHub
+          # Secrets. Falls back to empty (integration disabled) if the deploy role
+          # lacks ssm:GetParameter on it — the deploy still succeeds.
+          CRM_SERVICE_KEY=$(aws ssm get-parameter --name tact-crm-service-key --with-decryption --query Parameter.Value --output text 2>/dev/null || echo "")
           sam build
           sam deploy \
             --stack-name cmm-bedek \
@@ -63,5 +68,6 @@ jobs:
               SeedAdminEmail='${{ secrets.SEED_ADMIN_EMAIL }}' \
               SeedAdminPassword='${{ secrets.SEED_ADMIN_PASSWORD }}' \
               GoogleClientId=${{ vars.GOOGLE_CLIENT_ID }} \
+              CrmServiceKey="$CRM_SERVICE_KEY" \
               DomainName=${{ vars.DOMAIN_NAME }} \
               AcmCertificateArn=${{ vars.ACM_CERTIFICATE_ARN }}

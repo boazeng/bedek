@@ -116,6 +116,8 @@ export type Company = {
   contact_email: string | null
   phone: string | null
   is_active: boolean
+  /** Linked tenant id in TACT-CRM (one-time mapping). */
+  crm_company_id?: number | null
   created_at: string
 }
 
@@ -126,7 +128,16 @@ export type Project = {
   address: string | null
   project_manager: string | null
   site_manager: string | null
+  /** Set when the project header was imported from TACT-CRM. */
+  crm_external_id?: string | null
   created_at: string
+}
+
+export type CrmStatus = {
+  configured: boolean
+  crm_company_id: number | null
+  crm_company_name: string | null
+  error: string | null
 }
 
 export type LocationRow = {
@@ -389,6 +400,18 @@ export const Users = {
     api<UserRow>(`/api/admin/users/${id}`, { method: 'PUT', body }),
   remove: (id: number) =>
     api<void>(`/api/admin/users/${id}`, { method: 'DELETE' }),
+}
+
+export const Crm = {
+  /** Integration status + a whoami check against the linked CRM tenant. */
+  status: (companyId?: number) =>
+    api<CrmStatus>('/api/crm/status', { query: { company_id: companyId } }),
+  /** Import/update this company's real-estate (bedek) projects from CRM. */
+  syncProjects: (companyId?: number) =>
+    api<{ created: number; updated: number; total: number }>(
+      '/api/crm/sync-projects',
+      { method: 'POST', query: { company_id: companyId } },
+    ),
 }
 
 export const Projects = {

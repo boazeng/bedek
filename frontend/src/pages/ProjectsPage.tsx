@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Projects, type Project } from '../lib/api'
+import { Crm, Projects, type Project } from '../lib/api'
 import DataTable from '../components/DataTable'
 import Modal, { Field, inputStyle } from '../components/Modal'
 import { useAuth, useEffectiveCompanyId } from '../lib/AuthContext'
-import { useConfirm } from '../components/Dialog'
+import { useAlert, useConfirm } from '../components/Dialog'
 
 type FormState = Pick<Project, 'name' | 'address' | 'project_manager' | 'site_manager'>
 
@@ -18,7 +18,10 @@ export default function ProjectsPage() {
   const { user, activeProject, setActiveProject } = useAuth()
   const companyId = useEffectiveCompanyId()
   const confirm = useConfirm()
+  const alert = useAlert()
   const isAdmin = user?.role === 'super_admin' || user?.role === 'company_admin'
+  const [syncing, setSyncing] = useState(false)
+  const cidParam = user?.role === 'super_admin' ? companyId ?? undefined : undefined
   const [rows, setRows] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -77,6 +80,23 @@ export default function ProjectsPage() {
     }
   }
 
+  async function syncFromCrm() {
+    setSyncing(true)
+    try {
+      const res = await Crm.syncProjects(cidParam)
+      await alert({
+        title: 'סנכרון מ-CRM הושלם',
+        message: `נוצרו: ${res.created} · עודכנו: ${res.updated} · סה״כ ב-CRM: ${res.total}`,
+        variant: 'success',
+      })
+      load()
+    } catch (e) {
+      alert({ title: 'שגיאת סנכרון', message: String(e), variant: 'danger' })
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   async function remove(p: Project) {
     const ok = await confirm({
       title: 'מחיקת פרויקט',
@@ -109,9 +129,19 @@ export default function ProjectsPage() {
           </div>
         </div>
         {isAdmin && (
-          <button onClick={openCreate} className="tact-btn tact-btn-primary">
-            + פרויקט חדש
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={syncFromCrm}
+              className="tact-btn tact-btn-ghost"
+              disabled={syncing}
+              title="ייבא/עדכן את פרויקטי הבדק של החברה מ-TACT-CRM"
+            >
+              {syncing ? 'מסנכרן…' : '⟳ סנכרון מ-CRM'}
+            </button>
+            <button onClick={openCreate} className="tact-btn tact-btn-primary">
+              + פרויקט חדש
+            </button>
+          </div>
         )}
       </div>
 
@@ -123,7 +153,20 @@ export default function ProjectsPage() {
           rows={rows}
           rowKey={(r) => r.id}
           columns={[
-            { header: 'שם הפרויקט', key: 'name' },
+            {
+              header: 'שם הפרויקט',
+              key: 'name',
+              render: (r) => (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                  {r.name}
+                  {r.crm_external_id && (
+                    <span className="tact-badge tact-badge-on" title="פרויקט מסונכרן מ-TACT-CRM">
+                      מ-CRM
+                    </span>
+                  )}
+                </span>
+              ),
+            },
             { header: 'כתובת', key: 'address' },
             { header: 'מנהל פרויקט', key: 'project_manager' },
             { header: 'מנהל עבודה', key: 'site_manager' },
