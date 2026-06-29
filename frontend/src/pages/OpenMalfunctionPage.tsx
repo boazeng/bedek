@@ -75,17 +75,6 @@ const SOURCE_OPTIONS = [
   { value: 'email', label: 'מייל' },
 ]
 
-const GROUP_OPTIONS = [
-  { value: 'unassigned', label: 'טרם נבחר' },
-  { value: 'electricity', label: 'חשמל' },
-  { value: 'plumbing', label: 'אינסטלציה' },
-  { value: 'finishes', label: 'גמרים' },
-  { value: 'structure', label: 'שלד' },
-  { value: 'protection', label: 'מיגון' },
-  { value: 'sealing', label: 'איטום' },
-  { value: 'aluminum', label: 'אלומיניום' },
-]
-
 const UNIT_TYPE_LABEL: Record<string, string> = {
   apartment: 'דירה',
   parking: 'חניה',
@@ -114,7 +103,6 @@ export default function OpenMalfunctionPage() {
   const [locations, setLocations] = useState<LocationRow[]>([])
   const [trades, setTrades] = useState<CompanyProfessionalRow[]>([])
   const [description, setDescription] = useState('')
-  const [group, setGroup] = useState('unassigned')
   const [status, setStatus] = useState('pending_manager')
   const [source, setSource] = useState('manual')
   const [professional, setProfessional] = useState('')
@@ -193,7 +181,6 @@ export default function OpenMalfunctionPage() {
 
   function resetForm() {
     setDescription('')
-    setGroup('unassigned')
     setStatus('pending_manager')
     setSource('manual')
     setProfessional('')
@@ -222,7 +209,7 @@ export default function OpenMalfunctionPage() {
         description: description.trim(),
         status,
         source,
-        group,
+        group: 'unassigned',
         professional: professional.trim() || null,
         opened_at: openedAt || null,
       })
@@ -339,24 +326,6 @@ export default function OpenMalfunctionPage() {
           </div>
         )}
 
-        <Field
-          label="מיקום (סיווג)"
-          hint="מיקום הליקוי בתוך היחידה (סלון, מטבח…). מנוהל תחת ניהול חברה ← מיקומים של החברה."
-        >
-          <select
-            style={strongInputStyle}
-            value={locationId ?? ''}
-            onChange={(e) => setLocationId(e.target.value ? Number(e.target.value) : null)}
-          >
-            <option value="">— ללא מיקום —</option>
-            {locations.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-
         <Field label="תיאור התקלה">
           <textarea
             style={{ ...strongInputStyle, minHeight: 90, resize: 'vertical' }}
@@ -367,20 +336,30 @@ export default function OpenMalfunctionPage() {
         </Field>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Field label="קבוצה">
-            <select style={strongInputStyle} value={group} onChange={(e) => setGroup(e.target.value)}>
-              {GROUP_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
+          <Field label="מקצוע" hint="מתוך סיווגי בעלי המקצוע של החברה (ניהול חברה ← סיווגי בעלי מקצוע)">
+            <select
+              style={strongInputStyle}
+              value={professional}
+              onChange={(e) => setProfessional(e.target.value)}
+            >
+              <option value="">— בחר מקצוע —</option>
+              {trades.map((t) => (
+                <option key={t.id} value={t.name}>
+                  {t.name}
                 </option>
               ))}
             </select>
           </Field>
-          <Field label="סטטוס">
-            <select style={strongInputStyle} value={status} onChange={(e) => setStatus(e.target.value)}>
-              {STATUS_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
+          <Field label="מיקום">
+            <select
+              style={strongInputStyle}
+              value={locationId ?? ''}
+              onChange={(e) => setLocationId(e.target.value ? Number(e.target.value) : null)}
+            >
+              <option value="">— ללא מיקום —</option>
+              {locations.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
                 </option>
               ))}
             </select>
@@ -388,16 +367,11 @@ export default function OpenMalfunctionPage() {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Field label="בעל מקצוע">
-            <select
-              style={strongInputStyle}
-              value={professional}
-              onChange={(e) => setProfessional(e.target.value)}
-            >
-              <option value="">— ללא —</option>
-              {trades.map((t) => (
-                <option key={t.id} value={t.name}>
-                  {t.name}
+          <Field label="סטטוס">
+            <select style={strongInputStyle} value={status} onChange={(e) => setStatus(e.target.value)}>
+              {STATUS_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
                 </option>
               ))}
             </select>
@@ -412,7 +386,6 @@ export default function OpenMalfunctionPage() {
             </select>
           </Field>
         </div>
-
         <Field label="תאריך פתיחה">
           <input
             type="date"
