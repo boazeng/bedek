@@ -4,6 +4,8 @@ import {
   EditableText,
   MiniBtn,
   UNIT_TYPE_LABEL,
+  UNIT_TYPE_OPTIONS,
+  UNIT_TYPE_PLURAL,
   PUBLIC_OWNER,
   floorNumberLabel,
   type CollapseCmd,
@@ -35,6 +37,15 @@ export default function FloorNode({ projectId, floor, onRefresh, onConfirmDelete
   const [dragOver, setDragOver] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
   const units = floor.children
+
+  // Per-type breakdown, only for types that exist on the floor.
+  const unitSummary = UNIT_TYPE_OPTIONS.map((o) => ({
+    label: UNIT_TYPE_PLURAL[o.value],
+    n: units.filter((u) => u.unit_type === o.value).length,
+  }))
+    .filter((x) => x.n > 0)
+    .map((x) => `${x.label} - ${x.n}`)
+    .join(' · ')
 
   // Apply a "collapse all / expand all" broadcast from the toolbar.
   useEffect(() => {
@@ -184,7 +195,7 @@ export default function FloorNode({ projectId, floor, onRefresh, onConfirmDelete
         <EditableText value={floor.name} onSave={rename} bold width={150} />
         {units.length > 0 && (
           <span style={{ fontSize: '0.75rem', color: 'var(--color-text-light)' }}>
-            ({units.length} יחידות)
+            {unitSummary}
           </span>
         )}
         <span style={{ flex: 1 }} />

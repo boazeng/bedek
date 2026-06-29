@@ -35,6 +35,15 @@ export const UNIT_TYPE_LABEL: Record<string, string> = Object.fromEntries(
   UNIT_TYPE_OPTIONS.map((o) => [o.value, o.label]),
 )
 
+/** Plural labels for the per-floor unit-count summary. */
+export const UNIT_TYPE_PLURAL: Record<string, string> = {
+  apartment: 'דירות',
+  parking: 'חניות',
+  storage: 'מחסנים',
+  shop: 'חנויות',
+  public_area: 'ציבורי',
+}
+
 /** Small ghost action button used throughout the builder rows. */
 export function MiniBtn({
   onClick,
