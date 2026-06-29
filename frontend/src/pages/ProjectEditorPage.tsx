@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Projects, ProjectTree, type Project, type ProjectItemNode } from '../lib/api'
 import { useAuth } from '../lib/AuthContext'
 import { useAlert, useConfirm } from '../components/Dialog'
@@ -38,6 +38,37 @@ export default function ProjectEditorPage({ projectId }: Props) {
   useEffect(() => {
     if (user) load()
   }, [user, projectId])
+
+  // Auto-correct public-area units whenever the tree loads: owner = הועד and
+  // number = floor number. Fixes projects built before this rule existed.
+  const fixingPublic = useRef(false)
+  useEffect(() => {
+    if (loading || tree.length === 0 || fixingPublic.current) return
+    const pending: { id: number; number: string; name: string }[] = []
+    for (const b of tree)
+      for (const e of b.children)
+        for (const f of e.children) {
+          const numLabel = floorNumberLabel(f.name)
+          const wantName = `ציבורי ${numLabel}`.trim()
+          for (const u of f.children) {
+            if (u.unit_type !== 'public_area') continue
+            if (u.short_code !== numLabel || u.customer_name !== PUBLIC_OWNER || u.name !== wantName)
+              pending.push({ id: u.id, number: numLabel, name: wantName })
+          }
+        }
+    if (pending.length === 0) return
+    fixingPublic.current = true
+    ;(async () => {
+      for (const p of pending)
+        await ProjectTree.update(projectId, p.id, {
+          number: p.number,
+          name: p.name,
+          customer_name: PUBLIC_OWNER,
+        })
+      fixingPublic.current = false
+      refresh()
+    })()
+  }, [tree, loading])
 
   async function confirmDelete(label: string): Promise<boolean> {
     return confirm({
