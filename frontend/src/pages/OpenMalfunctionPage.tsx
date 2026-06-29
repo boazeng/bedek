@@ -443,7 +443,7 @@ export default function OpenMalfunctionPage() {
                   gridTemplateColumns: '150px 1fr 170px 34px',
                   gap: 8,
                   marginBottom: 8,
-                  alignItems: 'center',
+                  alignItems: 'start',
                 }}
               >
                 <input
@@ -452,8 +452,8 @@ export default function OpenMalfunctionPage() {
                   value={act.occurred_on}
                   onChange={(e) => updateActivityRow(i, { occurred_on: e.target.value })}
                 />
-                <input
-                  style={strongInputStyle}
+                <textarea
+                  style={{ ...strongInputStyle, minHeight: 44, resize: 'vertical' }}
                   placeholder="תיאור הפעילות"
                   value={act.action}
                   onChange={(e) => updateActivityRow(i, { action: e.target.value })}

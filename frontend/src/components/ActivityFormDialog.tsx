@@ -82,9 +82,9 @@ export default function ActivityFormDialog({
           onChange={(e) => setOccurredOn(e.target.value)}
         />
       </Field>
-      <Field label="פעילות" hint='למשל "ביקור אבחון", "צבע יד שנייה", "בדיקה סופית"'>
-        <input
-          style={inputStyle}
+      <Field label="פעילות" hint='למשל "ביקור אבחון", "צבע יד שנייה", "בדיקה סופית". ניתן לכתוב בכמה שורות.'>
+        <textarea
+          style={{ ...inputStyle, minHeight: 80, resize: 'vertical' }}
           value={action}
           onChange={(e) => setAction(e.target.value)}
         />

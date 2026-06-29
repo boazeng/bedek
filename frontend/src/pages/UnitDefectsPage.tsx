@@ -462,7 +462,7 @@ function DefectDetailView({ detail, canWrite }: { detail: MalfunctionDetail; can
                   <span style={{ fontFamily: 'var(--font-family-en)', fontSize: '0.78rem', color: 'var(--color-text-light)', minWidth: 90 }}>
                     {new Date(a.occurred_on).toLocaleDateString('he-IL')}
                   </span>
-                  <strong style={{ fontSize: '0.9rem' }}>{a.action}</strong>
+                  <strong style={{ fontSize: '0.9rem', whiteSpace: 'pre-wrap' }}>{a.action}</strong>
                   {a.performed_by && (
                     <span style={{ fontSize: '0.78rem', color: 'var(--color-text-light)' }}>· {a.performed_by}</span>
                   )}
