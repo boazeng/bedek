@@ -8,6 +8,7 @@ import CompaniesPage from './pages/CompaniesPage'
 import UsersPage from './pages/UsersPage'
 import ProjectsPage from './pages/ProjectsPage'
 import CustomersPage from './pages/CustomersPage'
+import ReportsPage from './pages/ReportsPage'
 import LocationsPage from './pages/LocationsPage'
 import AdminPage from './pages/AdminPage'
 import SystemAdminPage from './pages/SystemAdminPage'
@@ -75,6 +76,7 @@ function ProtectedShell() {
       {safe === 'company_users' && <UsersPage scope="company" />}
       {safe === 'projects' && <ProjectsPage />}
       {safe === 'customers' && <CustomersPage />}
+      {safe === 'reports' && <ReportsPage />}
       {safe === 'locations' && <LocationsPage onNavigate={setCurrent} />}
       {safe === 'admin' && <AdminPage onNavigate={setCurrent} />}
       {safe === 'system_admin' && <SystemAdminPage onNavigate={setCurrent} />}
