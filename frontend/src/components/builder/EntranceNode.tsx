@@ -21,13 +21,43 @@ export default function EntranceNode({ projectId, entrance, onRefresh, onConfirm
     await ProjectTree.remove(projectId, entrance.id)
     onRefresh()
   }
+  const isBasement = (f: ProjectItemNode) => f.name.includes('מרתף')
+  const isGround = (f: ProjectItemNode) => f.name.includes('קרקע')
+
+  // Add a regular numbered floor on top of the stack (highest level).
   async function addFloor() {
-    // Build from the ground up: the first floor is the ground floor.
+    const regular = floors.filter((f) => !isBasement(f) && !isGround(f)).length
     await ProjectTree.create(projectId, {
       kind: 'floor',
-      name: floors.length === 0 ? 'קומת קרקע' : `קומה ${floors.length}`,
+      name: `קומה ${regular + 1}`,
       parent_id: entrance.id,
     })
+    onRefresh()
+  }
+
+  // Add the ground floor just above any basements (below the numbered floors).
+  async function addGroundFloor() {
+    const created = await ProjectTree.create(projectId, {
+      kind: 'floor',
+      name: 'קומת קרקע',
+      parent_id: entrance.id,
+    })
+    const basements = floors.filter(isBasement).length
+    const existing = floors.map((f) => f.id)
+    const ids = [...existing.slice(0, basements), created.id, ...existing.slice(basements)]
+    await ProjectTree.reorder(projectId, entrance.id, ids)
+    onRefresh()
+  }
+
+  // Add a basement at the very bottom of the stack (below the ground floor).
+  async function addBasement() {
+    const count = floors.filter(isBasement).length
+    const created = await ProjectTree.create(projectId, {
+      kind: 'floor',
+      name: count === 0 ? 'קומת מרתף' : `קומת מרתף ${count + 1}`,
+      parent_id: entrance.id,
+    })
+    await ProjectTree.reorder(projectId, entrance.id, [created.id, ...floors.map((f) => f.id)])
     onRefresh()
   }
 
@@ -45,7 +75,9 @@ export default function EntranceNode({ projectId, entrance, onRefresh, onConfirm
         <span style={{ fontSize: '0.95rem' }}>🚪</span>
         <EditableText value={entrance.name} onSave={rename} bold width={150} />
         <span style={{ flex: 1 }} />
-        <MiniBtn onClick={addFloor}>+ קומה</MiniBtn>
+        <MiniBtn onClick={addFloor} title="הוסף קומה רגילה למעלה">+ קומה</MiniBtn>
+        <MiniBtn onClick={addGroundFloor} title="הוסף קומת קרקע (מתחת לקומה 1)">+ קומת קרקע</MiniBtn>
+        <MiniBtn onClick={addBasement} title="הוסף קומת מרתף (מתחת לקומת הקרקע)">+ מרתף</MiniBtn>
         <MiniBtn onClick={remove} danger title="מחק כניסה">
           מחק
         </MiniBtn>

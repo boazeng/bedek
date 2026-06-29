@@ -51,6 +51,10 @@ export default function FloorNode({ projectId, floor, onRefresh, onConfirmDelete
     await ProjectTree.bulkAddUnits(projectId, floor.id, { unit_type: unitType, count: 1 })
     onRefresh()
   }
+  async function duplicate() {
+    await ProjectTree.duplicate(projectId, floor.id)
+    onRefresh()
+  }
 
   return (
     <div
@@ -84,6 +88,7 @@ export default function FloorNode({ projectId, floor, onRefresh, onConfirmDelete
         <EditableText value={floor.name} onSave={rename} bold width={150} />
         <span style={{ flex: 1 }} />
         <MiniBtn onClick={() => setAddOpen(true)}>+ יחידות</MiniBtn>
+        <MiniBtn onClick={duplicate} title="שכפל את הקומה וכל היחידות שבה">שכפל</MiniBtn>
         <MiniBtn onClick={remove} danger title="מחק קומה">
           מחק
         </MiniBtn>
