@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ProjectTree, type BulkAddUnitsPayload, type ProjectItemNode } from '../../lib/api'
 import { EditableText, MiniBtn, UNIT_TYPE_LABEL, type CollapseCmd } from './shared'
+import { usePrompt } from '../Dialog'
 import AddUnitsModal from './AddUnitsModal'
 import { UNIT_DRAG_TYPE } from './UnitPalette'
 
@@ -12,7 +13,16 @@ type Props = {
   collapseCmd?: CollapseCmd
 }
 
+/** Ask the user for a repeat count (≥1) via the prompt dialog. Null = cancelled. */
+async function askCount(prompt: ReturnType<typeof usePrompt>, title: string, message: string): Promise<number | null> {
+  const v = await prompt({ title, message, initialValue: '1', placeholder: 'מספר פעמים' })
+  if (v === null) return null
+  const n = Math.floor(Number(v))
+  return Number.isFinite(n) && n >= 1 ? n : null
+}
+
 export default function FloorNode({ projectId, floor, onRefresh, onConfirmDelete, collapseCmd }: Props) {
+  const prompt = usePrompt()
   const [addOpen, setAddOpen] = useState(false)
   const [dragOver, setDragOver] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
@@ -58,34 +68,56 @@ export default function FloorNode({ projectId, floor, onRefresh, onConfirmDelete
     await ProjectTree.bulkAddUnits(projectId, floor.id, { unit_type: unitType, count: 1 })
     onRefresh()
   }
-  // "Duplicate" = add the next floor: bump the floor number (קומה 3 → קומה 4)
-  // and recreate the same unit mix, with apartment numbers continuing the
-  // entrance sequence (last apartment 12 → new floor starts at 13).
-  async function duplicate() {
+  // "Duplicate" = add the next floor(s): bump the floor number (קומה 3 → קומה 4,
+  // 5, …) and recreate the same unit mix, with apartment numbers continuing the
+  // entrance sequence (last apartment 12 → next floor starts at 13).
+  async function duplicateFloors(times: number) {
     const match = floor.name.match(/(\d+)\s*$/)
-    const nextName = match
-      ? floor.name.replace(/\d+\s*$/, String(Number(match[1]) + 1))
-      : `${floor.name} (עותק)`
-    const created = await ProjectTree.create(projectId, {
-      kind: 'floor',
-      name: nextName,
-      parent_id: floor.parent_id,
-    })
-
+    const base = match ? Number(match[1]) : null
+    const prefix = match ? floor.name.replace(/\d+\s*$/, '') : floor.name
     const apartments = units.filter((u) => u.unit_type === 'apartment').length
-    if (apartments > 0) {
-      // start_number omitted → backend continues from the next free number in the entrance.
-      await ProjectTree.bulkAddUnits(projectId, created.id, { unit_type: 'apartment', count: apartments })
-    }
-    for (const u of units) {
-      if (!u.unit_type || u.unit_type === 'apartment') continue
-      await ProjectTree.bulkAddUnits(projectId, created.id, {
-        unit_type: u.unit_type,
-        count: 1,
-        number: u.short_code || u.number || null,
-      })
+    const others = units.filter((u) => u.unit_type && u.unit_type !== 'apartment')
+
+    for (let i = 1; i <= times; i++) {
+      const name = base !== null ? `${prefix}${base + i}` : `${floor.name} (עותק${times > 1 ? ' ' + i : ''})`
+      const created = await ProjectTree.create(projectId, { kind: 'floor', name, parent_id: floor.parent_id })
+      if (apartments > 0) {
+        // start_number omitted → backend continues from the next free number in the entrance.
+        await ProjectTree.bulkAddUnits(projectId, created.id, { unit_type: 'apartment', count: apartments })
+      }
+      for (const u of others) {
+        await ProjectTree.bulkAddUnits(projectId, created.id, {
+          unit_type: u.unit_type!,
+          count: 1,
+          number: u.short_code || u.number || null,
+        })
+      }
     }
     onRefresh()
+  }
+  async function promptDuplicateFloors() {
+    const n = await askCount(prompt, 'שכפול קומה', 'כמה פעמים לשכפל את הקומה?')
+    if (n) await duplicateFloors(n)
+  }
+
+  // Add `times` storage units to this floor, numbered continuing the highest
+  // numeric storage number already on the floor. Apartment association is left
+  // blank for the user to fill.
+  async function duplicateStorage(times: number) {
+    const nums = units
+      .filter((u) => u.unit_type === 'storage')
+      .map((u) => parseInt(u.short_code || u.number || '', 10))
+      .filter((n) => !Number.isNaN(n))
+    let next = nums.length ? Math.max(...nums) : 0
+    for (let i = 0; i < times; i++) {
+      next += 1
+      await ProjectTree.bulkAddUnits(projectId, floor.id, { unit_type: 'storage', count: 1, number: String(next) })
+    }
+    onRefresh()
+  }
+  async function promptDuplicateStorage() {
+    const n = await askCount(prompt, 'שכפול מחסן', 'כמה מחסנים להוסיף לקומה?')
+    if (n) await duplicateStorage(n)
   }
 
   return (
@@ -131,7 +163,8 @@ export default function FloorNode({ projectId, floor, onRefresh, onConfirmDelete
         )}
         <span style={{ flex: 1 }} />
         <MiniBtn onClick={() => setAddOpen(true)}>+ יחידות</MiniBtn>
-        <MiniBtn onClick={duplicate} title="שכפל את הקומה וכל היחידות שבה">שכפל</MiniBtn>
+        <MiniBtn onClick={() => duplicateFloors(1)} title="שכפל את הקומה פעם אחת">שכפל</MiniBtn>
+        <MiniBtn onClick={promptDuplicateFloors} title="שכפל את הקומה כמה פעמים">שכפל ×</MiniBtn>
         <MiniBtn onClick={remove} danger title="מחק קומה">
           מחק
         </MiniBtn>
@@ -175,6 +208,9 @@ export default function FloorNode({ projectId, floor, onRefresh, onConfirmDelete
             >
               <span style={{ fontWeight: 600 }}>{UNIT_TYPE_LABEL[u.unit_type || ''] || 'יחידה'}</span>
               <span style={{ color: 'var(--color-text-light)' }}>{u.short_code || u.number || ''}</span>
+              {u.unit_type === 'storage' && u.customer_name && (
+                <span style={{ color: 'var(--color-text-light)' }}>← דירה {u.customer_name}</span>
+              )}
             </span>
           ))}
         </div>
@@ -182,34 +218,45 @@ export default function FloorNode({ projectId, floor, onRefresh, onConfirmDelete
 
       {!collapsed && units.length > 0 && (
         <div style={{ padding: '0 10px 8px' }}>
-          {units.map((u) => (
-            <div
-              key={u.id}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '5px 8px',
-                borderTop: '1px solid var(--color-border)',
-              }}
-            >
-              <span className="tact-badge tact-badge-on" style={{ minWidth: 56, textAlign: 'center' }}>
-                {UNIT_TYPE_LABEL[u.unit_type || ''] || 'יחידה'}
-              </span>
-              <span style={{ fontSize: '0.78rem', color: 'var(--color-text-light)' }}>מס׳</span>
-              <EditableText value={u.short_code || u.number || ''} onSave={(n) => setUnitNumber(u, n)} width={70} />
-              <EditableText
-                value={u.customer_name || ''}
-                onSave={(n) => setUnitCustomer(u, n)}
-                placeholder="שם לקוח…"
-                width={170}
-              />
-              <span style={{ flex: 1 }} />
-              <MiniBtn onClick={() => removeUnit(u)} danger title="מחק יחידה">
-                ✕
-              </MiniBtn>
-            </div>
-          ))}
+          {units.map((u) => {
+            const isStorage = u.unit_type === 'storage'
+            return (
+              <div
+                key={u.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '5px 8px',
+                  borderTop: '1px solid var(--color-border)',
+                }}
+              >
+                <span className="tact-badge tact-badge-on" style={{ minWidth: 56, textAlign: 'center' }}>
+                  {UNIT_TYPE_LABEL[u.unit_type || ''] || 'יחידה'}
+                </span>
+                <span style={{ fontSize: '0.78rem', color: 'var(--color-text-light)' }}>מס׳</span>
+                <EditableText value={u.short_code || u.number || ''} onSave={(n) => setUnitNumber(u, n)} width={70} />
+                {isStorage && (
+                  <span style={{ fontSize: '0.78rem', color: 'var(--color-text-light)' }}>שייך לדירה</span>
+                )}
+                <EditableText
+                  value={u.customer_name || ''}
+                  onSave={(n) => setUnitCustomer(u, n)}
+                  placeholder={isStorage ? 'מס׳ דירה…' : 'שם לקוח…'}
+                  width={isStorage ? 110 : 170}
+                />
+                <span style={{ flex: 1 }} />
+                {isStorage && (
+                  <MiniBtn onClick={promptDuplicateStorage} title="שכפל מחסן כמה פעמים">
+                    שכפל ×
+                  </MiniBtn>
+                )}
+                <MiniBtn onClick={() => removeUnit(u)} danger title="מחק יחידה">
+                  ✕
+                </MiniBtn>
+              </div>
+            )
+          })}
         </div>
       )}
 
