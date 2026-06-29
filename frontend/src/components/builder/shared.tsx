@@ -8,14 +8,19 @@ export type CollapseCmd = { all: boolean; n: number }
 /** Public-area units always belong to the house committee. */
 export const PUBLIC_OWNER = 'הועד'
 
-/** The "floor number" used as a public-area unit's number: the digits in the
- *  floor name (קומה 3 → "3"), or קרקע / מרתף for the special floors. */
+/** The "floor number" used as a public-area unit's number:
+ *  ground (קרקע) → "00", basement (מרתף) → "-01" (-02 for a 2nd basement…),
+ *  numbered floor (קומה 3) → "3". Special floors are checked first because
+ *  their names may also contain a digit. */
 export function floorNumberLabel(floorName: string): string {
+  if (floorName.includes('מרתף')) {
+    const m = floorName.match(/(\d+)/)
+    const n = m ? Number(m[1]) : 1
+    return `-${String(n).padStart(2, '0')}`
+  }
+  if (floorName.includes('קרקע')) return '00'
   const m = floorName.match(/(\d+)/)
-  if (m) return m[1]
-  if (floorName.includes('קרקע')) return 'קרקע'
-  if (floorName.includes('מרתף')) return 'מרתף'
-  return floorName
+  return m ? m[1] : floorName
 }
 
 export const UNIT_TYPE_OPTIONS: { value: SaleUnitType; label: string }[] = [
