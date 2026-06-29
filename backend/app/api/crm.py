@@ -49,10 +49,24 @@ def import_companies(
     _: User = Depends(require_super_admin),
 ):
     """Create/link the chosen CRM companies into bedek (curated — no mass
-    deactivation). Super-admin only."""
+    deactivation), and auto-import each one's projects. Super-admin only."""
     _require_configured()
     try:
         return crm_sync.import_companies(db, body.ids)
+    except crm_client.CrmError as e:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(e))
+
+
+@router.post("/sync-all-projects")
+def sync_all_projects(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_super_admin),
+):
+    """Sync projects for every CRM-linked company so all company users see the
+    projects built in CRM. Super-admin only."""
+    _require_configured()
+    try:
+        return crm_sync.sync_all_projects(db)
     except crm_client.CrmError as e:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(e))
 

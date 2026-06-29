@@ -100,7 +100,9 @@ export default function CompaniesPage() {
       setPickerOpen(false)
       await alert({
         title: 'ייבוא חברות הושלם',
-        message: `נוצרו: ${res.created} · עודכנו: ${res.updated}${res.skipped ? ` · דולגו: ${res.skipped}` : ''}`,
+        message:
+          `חברות — נוצרו: ${res.created} · עודכנו: ${res.updated}${res.skipped ? ` · דולגו: ${res.skipped}` : ''}\n` +
+          `פרויקטים — נוצרו: ${res.projects_created} · עודכנו: ${res.projects_updated}`,
         variant: 'success',
       })
       load()

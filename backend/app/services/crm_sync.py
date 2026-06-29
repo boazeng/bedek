@@ -1,9 +1,10 @@
 """Sync read-only data from TACT-CRM into bedek.
 
-For now: the company's real-estate (bedek) projects → bedek `projects`.
-De-duped by `crm_external_id` (the CRM project id), so re-running is idempotent.
-Customers are intentionally NOT bulk-imported — they will be pulled live and
-synced on demand when a customer is linked to an apartment (future feature).
+Companies are imported via an admin picker; importing a company also pulls its
+real-estate (bedek) projects automatically. Projects are de-duped by
+`crm_external_id` (the CRM project id), so re-running is idempotent. Customers
+are intentionally NOT bulk-imported — they will be pulled live and synced on
+demand when a customer is linked to an apartment (future feature).
 """
 from __future__ import annotations
 
@@ -38,9 +39,9 @@ def list_crm_companies(db: Session) -> list[dict]:
 
 
 def import_companies(db: Session, ids: list[int]) -> dict:
-    """Create/link the CHOSEN CRM companies into bedek. Curated — does NOT touch
-    companies the admin didn't select (no mass deactivation). Returns
-    {created, updated, skipped}."""
+    """Create/link the CHOSEN CRM companies into bedek AND import each one's bedek
+    projects. Curated — does NOT touch companies the admin didn't select.
+    Returns {created, updated, skipped, projects_created, projects_updated}."""
     crm_by_id = {int(c["id"]): c for c in crm_client.list_companies()}
     by_crm_id = {
         c.crm_company_id: c
@@ -48,6 +49,7 @@ def import_companies(db: Session, ids: list[int]) -> dict:
     }
 
     created = updated = skipped = 0
+    affected: list[Company] = []
     for raw in ids:
         crm_id = int(raw)
         info = crm_by_id.get(crm_id)
@@ -61,25 +63,66 @@ def import_companies(db: Session, ids: list[int]) -> dict:
                 existing.name = name
                 existing.is_active = True
                 updated += 1
+            affected.append(existing)
         else:
-            db.add(
-                Company(
-                    name=name,
-                    slug=_slug_for(crm_id, name),
-                    crm_company_id=crm_id,
-                    is_active=True,
-                )
+            company = Company(
+                name=name,
+                slug=_slug_for(crm_id, name),
+                crm_company_id=crm_id,
+                is_active=True,
             )
+            db.add(company)
             created += 1
+            affected.append(company)
+
+    db.flush()  # assign ids to newly created companies before syncing projects
+
+    # Auto-import each imported company's projects.
+    proj_created = proj_updated = 0
+    for company in affected:
+        try:
+            r = _sync_projects(db, company)
+            proj_created += r["created"]
+            proj_updated += r["updated"]
+        except crm_client.CrmError:
+            # Don't fail the whole import if one company's projects can't be read.
+            continue
 
     db.commit()
-    return {"created": created, "updated": updated, "skipped": skipped}
+    return {
+        "created": created,
+        "updated": updated,
+        "skipped": skipped,
+        "projects_created": proj_created,
+        "projects_updated": proj_updated,
+    }
 
 
-def sync_projects(db: Session, company: Company) -> dict:
-    """Upsert the linked CRM tenant's bedek projects into this company.
+def sync_all_projects(db: Session) -> dict:
+    """Sync projects for every CRM-linked, active company (super-admin action).
+    Returns {companies, projects_created, projects_updated}."""
+    companies = (
+        db.query(Company)
+        .filter(Company.crm_company_id.isnot(None), Company.is_active.is_(True))
+        .all()
+    )
+    proj_created = proj_updated = 0
+    done = 0
+    for company in companies:
+        try:
+            r = _sync_projects(db, company)
+            proj_created += r["created"]
+            proj_updated += r["updated"]
+            done += 1
+        except crm_client.CrmError:
+            continue
+    db.commit()
+    return {"companies": done, "projects_created": proj_created, "projects_updated": proj_updated}
 
-    Returns a summary {created, updated, total}."""
+
+def _sync_projects(db: Session, company: Company) -> dict:
+    """Upsert the linked CRM tenant's bedek projects into this company. No commit
+    — the caller commits (lets us batch multiple companies)."""
     if not company.crm_company_id:
         raise ValueError("This company is not linked to a CRM company")
 
@@ -108,5 +151,11 @@ def sync_projects(db: Session, company: Company) -> dict:
             db.add(Project(company_id=company.id, name=name, crm_external_id=ext))
             created += 1
 
-    db.commit()
     return {"created": created, "updated": updated, "total": len(crm_projects)}
+
+
+def sync_projects(db: Session, company: Company) -> dict:
+    """Public single-company project sync (commits)."""
+    r = _sync_projects(db, company)
+    db.commit()
+    return r

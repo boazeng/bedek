@@ -406,11 +406,20 @@ export const Crm = {
   /** CRM companies for the import picker (each flagged if already linked). super_admin. */
   companies: () =>
     api<{ id: number; name: string; linked: boolean }[]>('/api/crm/companies'),
-  /** Create/link the chosen CRM companies into bedek (curated). super_admin. */
+  /** Create/link the chosen CRM companies + auto-import their projects. super_admin. */
   importCompanies: (ids: number[]) =>
-    api<{ created: number; updated: number; skipped: number }>(
-      '/api/crm/import-companies',
-      { method: 'POST', body: { ids } },
+    api<{
+      created: number
+      updated: number
+      skipped: number
+      projects_created: number
+      projects_updated: number
+    }>('/api/crm/import-companies', { method: 'POST', body: { ids } }),
+  /** Sync projects for every CRM-linked company. super_admin. */
+  syncAllProjects: () =>
+    api<{ companies: number; projects_created: number; projects_updated: number }>(
+      '/api/crm/sync-all-projects',
+      { method: 'POST' },
     ),
   /** Integration status + a whoami check against the linked CRM tenant. */
   status: (companyId?: number) =>

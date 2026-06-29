@@ -1,3 +1,6 @@
+import { useState } from 'react'
+import { Crm } from '../lib/api'
+import { useAlert } from '../components/Dialog'
 import TactIcon from '../components/TactIcon'
 import type { NavKey } from '../components/AppShell'
 
@@ -35,15 +38,44 @@ const LINKS: AdminLink[] = [
 ]
 
 export default function SystemAdminPage({ onNavigate }: Props) {
+  const alert = useAlert()
+  const [syncing, setSyncing] = useState(false)
+
+  async function syncAllProjects() {
+    setSyncing(true)
+    try {
+      const res = await Crm.syncAllProjects()
+      await alert({
+        title: 'סנכרון פרויקטים מ-CRM',
+        message: `סונכרנו ${res.companies} חברות · פרויקטים נוצרו: ${res.projects_created} · עודכנו: ${res.projects_updated}`,
+        variant: 'success',
+      })
+    } catch (e) {
+      alert({ title: 'שגיאת סנכרון', message: String(e), variant: 'danger' })
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   return (
     <div>
-      <div style={{ marginBottom: 18 }}>
-        <h2 style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--color-primary)' }}>
-          ניהול מערכת
-        </h2>
-        <div style={{ fontSize: '0.85rem', color: 'var(--color-text-light)' }}>
-          הגדרות מערכת ותחזוקה — מיועד לבעלים
+      <div style={{ marginBottom: 18, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <h2 style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--color-primary)' }}>
+            ניהול מערכת
+          </h2>
+          <div style={{ fontSize: '0.85rem', color: 'var(--color-text-light)' }}>
+            הגדרות מערכת ותחזוקה — מיועד לבעלים
+          </div>
         </div>
+        <button
+          onClick={syncAllProjects}
+          className="tact-btn tact-btn-ghost"
+          disabled={syncing}
+          title="משוך/עדכן את הפרויקטים של כל החברות המקושרות מ-TACT-CRM"
+        >
+          {syncing ? 'מסנכרן…' : '⟳ סנכרון פרויקטים מ-CRM'}
+        </button>
       </div>
 
       <div
