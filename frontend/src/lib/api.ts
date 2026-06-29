@@ -165,6 +165,16 @@ export type CompanyProfessionalRow = {
   is_active: boolean
 }
 
+/** A buyer / customer (לקוח / רוכש) — scoped to a company and (optionally) a project. */
+export type Buyer = {
+  id: number
+  company_id: number
+  project_id: number | null
+  name: string
+  nickname: string | null
+  phone: string | null
+}
+
 export type ProjectItemKind = 'building' | 'entrance' | 'floor' | 'unit'
 
 /** Sale-unit type (only meaningful on kind='unit' rows). */
@@ -186,6 +196,9 @@ export type ProjectItemNode = {
   permanent_apt_number: string | null
   /** Free-text customer label — shown next to the row name. */
   customer_name: string | null
+  /** Linked buyer (the unit's customer), if any. */
+  buyer_id: number | null
+  buyer_name: string | null
   /** Name of the ancestor floor — null for buildings and floors themselves. */
   floor_name: string | null
   children: ProjectItemNode[]
@@ -209,6 +222,7 @@ export type ProjectItemUpdate = {
   temp_apt_number?: string | null
   permanent_apt_number?: string | null
   customer_name?: string | null
+  buyer_id?: number | null
 }
 
 export type BulkAddUnitsPayload = {
@@ -482,6 +496,25 @@ export const ProjectTree = {
     api<{ renumbered: number }>(`/api/projects/${projectId}/tree/renumber`, {
       method: 'POST',
     }),
+}
+
+export type BuyerInput = {
+  name: string
+  nickname?: string | null
+  phone?: string | null
+  project_id?: number | null
+}
+
+export const Buyers = {
+  list: (opts: { companyId?: number; projectId?: number } = {}) =>
+    api<Buyer[]>('/api/buyers', {
+      query: { company_id: opts.companyId, project_id: opts.projectId },
+    }),
+  create: (body: BuyerInput, companyId?: number) =>
+    api<Buyer>('/api/buyers', { method: 'POST', body, query: { company_id: companyId } }),
+  update: (id: number, body: BuyerInput) =>
+    api<Buyer>(`/api/buyers/${id}`, { method: 'PUT', body }),
+  remove: (id: number) => api<void>(`/api/buyers/${id}`, { method: 'DELETE' }),
 }
 
 export const Professionals = {

@@ -9,7 +9,7 @@ from ..deps import (
     require_company_admin,
     user_can_access_project,
 )
-from ..models import Project, ProjectItem, User
+from ..models import Buyer, Project, ProjectItem, User
 from ..schemas.project_item import (
     BulkAddUnitsRequest,
     DuplicateResponse,
@@ -39,6 +39,7 @@ def _node(item: ProjectItem) -> ProjectItemNode:
         temp_apt_number=item.temp_apt_number,
         permanent_apt_number=item.permanent_apt_number,
         customer_name=item.customer_name,
+        buyer_id=item.buyer_id,
         children=[],
     )
 
@@ -115,7 +116,7 @@ def update_project_item(
     db: Session = Depends(get_db),
     actor: User = Depends(require_company_admin),
 ):
-    _get_project_for_write(project_id, actor, db)
+    project = _get_project_for_write(project_id, actor, db)
     item = _item_in_project(db, project_id, item_id)
     svc.update_item(
         db,
@@ -129,6 +130,22 @@ def update_project_item(
         permanent_apt_number=body.permanent_apt_number,
         customer_name=body.customer_name,
     )
+    # buyer_id: explicit field — present means set/clear (null clears the link).
+    if "buyer_id" in body.model_fields_set:
+        if body.buyer_id:
+            buyer = (
+                db.query(Buyer)
+                .filter(Buyer.id == body.buyer_id, Buyer.company_id == project.company_id)
+                .first()
+            )
+            if not buyer:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Buyer not found in this company",
+                )
+            item.buyer_id = buyer.id
+        else:
+            item.buyer_id = None
     db.commit()
     return _node(item)
 

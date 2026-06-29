@@ -1,4 +1,4 @@
-import { ProjectTree, type ProjectItemNode } from '../../lib/api'
+import { ProjectTree, type Buyer, type ProjectItemNode } from '../../lib/api'
 import { EditableText, MiniBtn, type CollapseCmd } from './shared'
 import EntranceNode from './EntranceNode'
 
@@ -8,11 +8,12 @@ type Props = {
   onRefresh: () => void
   onConfirmDelete: (label: string) => Promise<boolean>
   collapseCmd?: CollapseCmd
+  buyers?: Buyer[]
 }
 
 const ENTRANCE_LETTERS = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ז', 'ח', 'ט', 'י']
 
-export default function BuildingNode({ projectId, building, onRefresh, onConfirmDelete, collapseCmd }: Props) {
+export default function BuildingNode({ projectId, building, onRefresh, onConfirmDelete, collapseCmd, buyers }: Props) {
   const entrances = building.children
 
   async function rename(next: string) {
@@ -68,6 +69,7 @@ export default function BuildingNode({ projectId, building, onRefresh, onConfirm
             onRefresh={onRefresh}
             onConfirmDelete={onConfirmDelete}
             collapseCmd={collapseCmd}
+            buyers={buyers}
           />
         ))}
       </div>

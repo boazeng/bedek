@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ProjectTree, type BulkAddUnitsPayload, type ProjectItemNode } from '../../lib/api'
+import { ProjectTree, type Buyer, type BulkAddUnitsPayload, type ProjectItemNode } from '../../lib/api'
 import {
   EditableText,
   MiniBtn,
@@ -18,6 +18,7 @@ type Props = {
   onRefresh: () => void
   onConfirmDelete: (label: string) => Promise<boolean>
   collapseCmd?: CollapseCmd
+  buyers?: Buyer[]
 }
 
 /** Ask the user for a repeat count (≥1) via the prompt dialog. Null = cancelled. */
@@ -28,7 +29,7 @@ async function askCount(prompt: ReturnType<typeof usePrompt>, title: string, mes
   return Number.isFinite(n) && n >= 1 ? n : null
 }
 
-export default function FloorNode({ projectId, floor, onRefresh, onConfirmDelete, collapseCmd }: Props) {
+export default function FloorNode({ projectId, floor, onRefresh, onConfirmDelete, collapseCmd, buyers = [] }: Props) {
   const prompt = usePrompt()
   const [addOpen, setAddOpen] = useState(false)
   const [dragOver, setDragOver] = useState(false)
@@ -71,6 +72,10 @@ export default function FloorNode({ projectId, floor, onRefresh, onConfirmDelete
   }
   async function setUnitCustomer(u: ProjectItemNode, next: string) {
     await ProjectTree.update(projectId, u.id, { customer_name: next })
+    onRefresh()
+  }
+  async function setUnitBuyer(u: ProjectItemNode, buyerId: number | null) {
+    await ProjectTree.update(projectId, u.id, { buyer_id: buyerId })
     onRefresh()
   }
   async function removeUnit(u: ProjectItemNode) {
@@ -269,13 +274,37 @@ export default function FloorNode({ projectId, floor, onRefresh, onConfirmDelete
                 {isPublic ? (
                   // Public-area owner is always the house committee.
                   <span style={{ color: 'var(--color-text)' }}>בעלים: {PUBLIC_OWNER}</span>
-                ) : (
+                ) : isStorage ? (
                   <EditableText
                     value={u.customer_name || ''}
                     onSave={(n) => setUnitCustomer(u, n)}
-                    placeholder={isStorage ? 'מס׳ דירה…' : 'שם לקוח…'}
-                    width={isStorage ? 110 : 170}
+                    placeholder="מס׳ דירה…"
+                    width={110}
                   />
+                ) : (
+                  // Apartment / parking / shop: pick the customer from the project's buyers.
+                  <select
+                    value={u.buyer_id ?? ''}
+                    onChange={(e) => setUnitBuyer(u, e.target.value ? Number(e.target.value) : null)}
+                    style={{
+                      font: 'inherit',
+                      fontSize: '0.82rem',
+                      padding: '4px 8px',
+                      borderRadius: 6,
+                      border: '1px solid var(--color-border)',
+                      background: 'var(--color-bg-white)',
+                      color: 'var(--color-text)',
+                      minWidth: 180,
+                    }}
+                  >
+                    <option value="">— ללא לקוח —</option>
+                    {buyers.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
+                        {b.nickname ? ` (${b.nickname})` : ''}
+                      </option>
+                    ))}
+                  </select>
                 )}
                 <span style={{ flex: 1 }} />
                 {isStorage && (

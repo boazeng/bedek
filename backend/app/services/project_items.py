@@ -13,7 +13,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from ..models import ProjectItem, ProjectItemKind, SaleUnitType
+from ..models import Buyer, ProjectItem, ProjectItemKind, SaleUnitType
 from ..schemas.project_item import ProjectItemNode
 
 
@@ -63,6 +63,13 @@ def get_tree(db: Session, project_id: int) -> list[ProjectItemNode]:
     for r in rows:
         by_parent[r.parent_id].append(r)
 
+    # Resolve linked buyer names in one query.
+    buyer_ids = {r.buyer_id for r in rows if r.buyer_id}
+    buyer_names: dict[int, str] = {}
+    if buyer_ids:
+        for b in db.query(Buyer).filter(Buyer.id.in_(buyer_ids)).all():
+            buyer_names[b.id] = b.display_name
+
     project_code = f"P{project_id:05d}"
 
     def build(
@@ -107,6 +114,8 @@ def get_tree(db: Session, project_id: int) -> list[ProjectItemNode]:
                 temp_apt_number=r.temp_apt_number,
                 permanent_apt_number=r.permanent_apt_number,
                 customer_name=r.customer_name,
+                buyer_id=r.buyer_id,
+                buyer_name=buyer_names.get(r.buyer_id) if r.buyer_id else None,
                 floor_name=shown_floor_name,
                 children=build(r.id, full_number, child_floor_name),
             )

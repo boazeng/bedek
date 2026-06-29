@@ -5,6 +5,7 @@ from .config import settings
 from .database import Base, engine, ensure_schema_migrations
 from .api import (
     auth,
+    buyers,
     companies,
     company_professionals,
     crm,
@@ -51,6 +52,7 @@ def create_app() -> FastAPI:
     app.include_router(crm.router)
     app.include_router(project_items.router)
     app.include_router(malfunctions.router)
+    app.include_router(buyers.router)
     return app
 
 

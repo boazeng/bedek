@@ -29,6 +29,7 @@ class ProjectItemUpdate(BaseModel):
     temp_apt_number: str | None = None
     permanent_apt_number: str | None = None
     customer_name: str | None = None
+    buyer_id: int | None = None    # link to a buyer; null clears the link
 
 
 class ProjectItemNode(BaseModel):
@@ -51,6 +52,9 @@ class ProjectItemNode(BaseModel):
     permanent_apt_number: str | None = None
     # Free-text customer label shown next to the row name.
     customer_name: str | None = None
+    # Linked buyer (the unit's customer), if any.
+    buyer_id: int | None = None
+    buyer_name: str | None = None
     # Name of the nearest FLOOR ancestor (None for buildings/entrances/floors).
     floor_name: str | None = None
     children: list["ProjectItemNode"] = []

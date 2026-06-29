@@ -63,8 +63,13 @@ class ProjectItem(Base):
     # Permanent apartment number (e.g. assigned at handover by Tabu/municipality).
     permanent_apt_number: Mapped[str | None] = mapped_column(String(40))
     # Free-text customer label shown inline beside the name in the tree UI.
-    # (Free text for now; could later be promoted to a FK on the buyers table.)
+    # Used for storage→apartment links and other ad-hoc labels.
     customer_name: Mapped[str | None] = mapped_column(String(200))
+    # Optional link to a buyer (the unit's customer). Selected from the
+    # project's buyers; takes precedence over customer_name for display.
+    buyer_id: Mapped[int | None] = mapped_column(
+        ForeignKey("buyers.id", ondelete="SET NULL")
+    )
 
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(

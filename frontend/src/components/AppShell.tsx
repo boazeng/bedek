@@ -9,6 +9,7 @@ export type NavKey =
   | 'open_malfunction'
   | 'companies'          // moved into system_admin
   | 'projects'
+  | 'customers'          // buyers, under projects
   | 'locations'          // moved into admin
   | 'malfunctions'
   | 'unit_defects'       // sub-page of malfunctions (no sidebar entry)
@@ -32,6 +33,7 @@ const MAIN_NAV: NavItem[] = [
   { key: 'open_malfunction', label: 'פתיחת תקלה', icon: 'tool', roles: ['super_admin', 'company_admin', 'company_user'] },
   { key: 'malfunctions', label: 'תקלות',      icon: 'alert',      roles: ['super_admin', 'company_admin', 'company_user'] },
   { key: 'projects',   label: 'פרויקטים',      icon: 'document',   roles: ['super_admin', 'company_admin', 'company_user'] },
+  { key: 'customers',  label: 'לקוחות',        icon: 'users',      roles: ['super_admin', 'company_admin', 'company_user'] },
   { key: 'admin',      label: 'ניהול חברה',    icon: 'server',     roles: ['super_admin', 'company_admin'] },
 ]
 

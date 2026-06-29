@@ -42,6 +42,9 @@ _INPLACE_COLUMN_MIGRATIONS: list[tuple[str, str, str]] = [
     ("project_items", "permanent_apt_number", "VARCHAR(40)"),
     ("project_items", "floor", "VARCHAR(40)"),
     ("project_items", "customer_name", "VARCHAR(200)"),
+    ("project_items", "buyer_id", "INTEGER"),
+    ("buyers", "project_id", "INTEGER"),
+    ("buyers", "nickname", "VARCHAR(100)"),
 ]
 
 

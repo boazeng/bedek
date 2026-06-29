@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Projects, ProjectTree, type Project, type ProjectItemNode } from '../lib/api'
+import { Buyers, Projects, ProjectTree, type Buyer, type Project, type ProjectItemNode } from '../lib/api'
 import { useAuth } from '../lib/AuthContext'
 import { useAlert, useConfirm } from '../components/Dialog'
 import LoginPage from './LoginPage'
@@ -16,6 +16,7 @@ export default function ProjectEditorPage({ projectId }: Props) {
   const confirm = useConfirm()
   const [project, setProject] = useState<Project | null>(null)
   const [tree, setTree] = useState<ProjectItemNode[]>([])
+  const [buyers, setBuyers] = useState<Buyer[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -27,6 +28,13 @@ export default function ProjectEditorPage({ projectId }: Props) {
       .then(([p, t]) => {
         setProject(p)
         setTree(t)
+        // Project buyers power the per-unit customer picker.
+        Buyers.list({
+          companyId: user?.role === 'super_admin' ? p.company_id : undefined,
+          projectId,
+        })
+          .then(setBuyers)
+          .catch(() => setBuyers([]))
       })
       .catch((e) => setError(String(e)))
       .finally(() => {
@@ -287,6 +295,7 @@ export default function ProjectEditorPage({ projectId }: Props) {
                 onRefresh={refresh}
                 onConfirmDelete={confirmDelete}
                 collapseCmd={collapseCmd}
+                buyers={buyers}
               />
             ))
           )}
