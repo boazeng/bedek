@@ -22,9 +22,10 @@ export default function EntranceNode({ projectId, entrance, onRefresh, onConfirm
     onRefresh()
   }
   async function addFloor() {
+    // Build from the ground up: the first floor is the ground floor.
     await ProjectTree.create(projectId, {
       kind: 'floor',
-      name: `קומה ${floors.length + 1}`,
+      name: floors.length === 0 ? 'קומת קרקע' : `קומה ${floors.length}`,
       parent_id: entrance.id,
     })
     onRefresh()
@@ -56,7 +57,8 @@ export default function EntranceNode({ projectId, entrance, onRefresh, onConfirm
             אין קומות עדיין — לחץ "+ קומה".
           </div>
         ) : (
-          floors.map((f) => (
+          // Display bottom-up: ground floor sits at the bottom, upper floors stack above.
+          [...floors].reverse().map((f) => (
             <FloorNode
               key={f.id}
               projectId={projectId}

@@ -5,6 +5,7 @@ import { useAlert, useConfirm } from '../components/Dialog'
 import LoginPage from './LoginPage'
 import TactLogo from '../components/TactLogo'
 import BuildingNode from '../components/builder/BuildingNode'
+import UnitPalette from '../components/builder/UnitPalette'
 
 type Props = { projectId: number }
 
@@ -122,45 +123,71 @@ export default function ProjectEditorPage({ projectId }: Props) {
         </a>
       </div>
 
-      <div style={{ maxWidth: 900, margin: '0 auto', padding: '22px 20px' }}>
-        <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
-          <button className="tact-btn tact-btn-primary" onClick={addBuilding} disabled={busy}>
-            + בניין
-          </button>
-          <button className="tact-btn tact-btn-ghost" onClick={renumber} disabled={busy || tree.length === 0}>
-            מספור דירות מחדש
-          </button>
-        </div>
+      <div
+        style={{
+          maxWidth: 1140,
+          margin: '0 auto',
+          padding: '22px 20px',
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 18,
+        }}
+      >
+        {/* Side palette — always visible, sticky while scrolling the tree. */}
+        <aside
+          style={{
+            width: 210,
+            flexShrink: 0,
+            position: 'sticky',
+            top: 16,
+          }}
+        >
+          <UnitPalette vertical />
+        </aside>
 
-        {error && <div style={{ color: 'var(--color-accent)', marginBottom: 10 }}>{error}</div>}
-
-        {loading ? (
-          <div style={{ color: 'var(--color-text-light)' }}>טוען…</div>
-        ) : tree.length === 0 ? (
-          <div
-            style={{
-              background: 'var(--color-bg-white)',
-              border: '1px dashed var(--color-border)',
-              borderRadius: 14,
-              padding: '60px 20px',
-              textAlign: 'center',
-              color: 'var(--color-text-light)',
-            }}
-          >
-            <div style={{ fontSize: '0.95rem', marginBottom: 6 }}>הפרויקט עדיין ריק</div>
-            <div style={{ fontSize: '0.82rem' }}>לחץ "+ בניין" כדי להתחיל לבנות.</div>
+        {/* Main column — actions + structure tree. */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
+            <button className="tact-btn tact-btn-primary" onClick={addBuilding} disabled={busy}>
+              + בניין
+            </button>
+            <button className="tact-btn tact-btn-ghost" onClick={renumber} disabled={busy || tree.length === 0}>
+              מספור דירות מחדש
+            </button>
           </div>
-        ) : (
-          tree.map((b) => (
-            <BuildingNode
-              key={b.id}
-              projectId={projectId}
-              building={b}
-              onRefresh={refresh}
-              onConfirmDelete={confirmDelete}
-            />
-          ))
-        )}
+
+          {error && <div style={{ color: 'var(--color-accent)', marginBottom: 10 }}>{error}</div>}
+
+          {loading ? (
+            <div style={{ color: 'var(--color-text-light)' }}>טוען…</div>
+          ) : tree.length === 0 ? (
+            <div
+              style={{
+                background: 'var(--color-bg-white)',
+                border: '1px dashed var(--color-border)',
+                borderRadius: 14,
+                padding: '60px 20px',
+                textAlign: 'center',
+                color: 'var(--color-text-light)',
+              }}
+            >
+              <div style={{ fontSize: '0.95rem', marginBottom: 6 }}>הפרויקט עדיין ריק</div>
+              <div style={{ fontSize: '0.82rem' }}>
+                לחץ "+ בניין" כדי להתחיל. אחר כך הוסף קומות וגרור יחידות מהפאנל שבצד אל כל קומה.
+              </div>
+            </div>
+          ) : (
+            tree.map((b) => (
+              <BuildingNode
+                key={b.id}
+                projectId={projectId}
+                building={b}
+                onRefresh={refresh}
+                onConfirmDelete={confirmDelete}
+              />
+            ))
+          )}
+        </div>
       </div>
     </div>
   )

@@ -16,6 +16,12 @@ type AdminLink = {
 
 const LINKS: AdminLink[] = [
   {
+    key: 'project_structure',
+    label: 'מבנה הפרויקטים',
+    icon: 'building',
+    description: 'בניית מבנה הפרויקט — בניינים, כניסות, קומות ויחידות ממכר (בגרירה)',
+  },
+  {
     key: 'company_users',
     label: 'משתמשי חברה',
     icon: 'users',

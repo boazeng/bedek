@@ -12,6 +12,7 @@ import AdminPage from './pages/AdminPage'
 import SystemAdminPage from './pages/SystemAdminPage'
 import ProfessionalsPage from './pages/ProfessionalsPage'
 import CompanyProfessionalsPage from './pages/CompanyProfessionalsPage'
+import ProjectStructurePage from './pages/ProjectStructurePage'
 import ProjectEditorPage from './pages/ProjectEditorPage'
 import MalfunctionsPage from './pages/MalfunctionsPage'
 import OpenMalfunctionPage from './pages/OpenMalfunctionPage'
@@ -25,7 +26,7 @@ const SYSTEM_ADMIN_SUBPAGES: NavKey[] = [
   'professionals',
 ]
 // Sub-pages of the company admin (ניהול חברה).
-const ADMIN_SUBPAGES: NavKey[] = ['company_users', 'locations', 'company_professionals']
+const ADMIN_SUBPAGES: NavKey[] = ['company_users', 'locations', 'company_professionals', 'project_structure']
 const MALFUNCTION_SUBPAGES: NavKey[] = ['unit_defects']
 
 /** Parses the URL for stand-alone editor routes that open in their own tab. */
@@ -75,6 +76,7 @@ function ProtectedShell() {
       {safe === 'system_admin' && <SystemAdminPage onNavigate={setCurrent} />}
       {safe === 'professionals' && <ProfessionalsPage onNavigate={setCurrent} />}
       {safe === 'company_professionals' && <CompanyProfessionalsPage onNavigate={setCurrent} />}
+      {safe === 'project_structure' && <ProjectStructurePage />}
       {safe === 'malfunctions' && (
         <MalfunctionsPage
           onOpenUnit={(pid, uid) => {

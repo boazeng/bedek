@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ProjectTree, type BulkAddUnitsPayload, type ProjectItemNode } from '../../lib/api'
 import { EditableText, MiniBtn, UNIT_TYPE_LABEL } from './shared'
 import AddUnitsModal from './AddUnitsModal'
+import { UNIT_DRAG_TYPE } from './UnitPalette'
 
 type Props = {
   projectId: number
@@ -12,6 +13,7 @@ type Props = {
 
 export default function FloorNode({ projectId, floor, onRefresh, onConfirmDelete }: Props) {
   const [addOpen, setAddOpen] = useState(false)
+  const [dragOver, setDragOver] = useState(false)
   const units = floor.children
 
   async function rename(next: string) {
@@ -45,12 +47,35 @@ export default function FloorNode({ projectId, floor, onRefresh, onConfirmDelete
     onRefresh()
   }
 
+  async function dropUnit(unitType: string) {
+    await ProjectTree.bulkAddUnits(projectId, floor.id, { unit_type: unitType, count: 1 })
+    onRefresh()
+  }
+
   return (
     <div
+      onDragOver={(e) => {
+        if (!e.dataTransfer.types.includes(UNIT_DRAG_TYPE)) return
+        e.preventDefault()
+        e.dataTransfer.dropEffect = 'copy'
+        if (!dragOver) setDragOver(true)
+      }}
+      onDragLeave={(e) => {
+        // Ignore leave events bubbling from child elements.
+        if (e.currentTarget.contains(e.relatedTarget as Node)) return
+        setDragOver(false)
+      }}
+      onDrop={(e) => {
+        const unitType = e.dataTransfer.getData(UNIT_DRAG_TYPE)
+        setDragOver(false)
+        if (!unitType) return
+        e.preventDefault()
+        dropUnit(unitType)
+      }}
       style={{
-        border: '1px solid var(--color-border)',
+        border: dragOver ? '2px dashed var(--color-accent)' : '1px solid var(--color-border)',
         borderRadius: 10,
-        background: 'var(--color-bg)',
+        background: dragOver ? 'var(--color-primary-soft)' : 'var(--color-bg)',
         marginBottom: 8,
       }}
     >
@@ -63,6 +88,22 @@ export default function FloorNode({ projectId, floor, onRefresh, onConfirmDelete
           מחק
         </MiniBtn>
       </div>
+
+      {units.length === 0 && (
+        <div
+          style={{
+            margin: '0 10px 8px',
+            padding: '12px 10px',
+            border: '1px dashed var(--color-border)',
+            borderRadius: 8,
+            textAlign: 'center',
+            fontSize: '0.78rem',
+            color: dragOver ? 'var(--color-accent)' : 'var(--color-text-light)',
+          }}
+        >
+          {dragOver ? 'שחרר כאן להוספת יחידה' : 'גרור יחידה לכאן או לחץ "+ יחידות"'}
+        </div>
+      )}
 
       {units.length > 0 && (
         <div style={{ padding: '0 10px 8px' }}>
