@@ -6,7 +6,7 @@ import LoginPage from './LoginPage'
 import TactLogo from '../components/TactLogo'
 import BuildingNode from '../components/builder/BuildingNode'
 import UnitPalette from '../components/builder/UnitPalette'
-import type { CollapseCmd } from '../components/builder/shared'
+import { PUBLIC_OWNER, floorNumberLabel, type CollapseCmd } from '../components/builder/shared'
 
 type Props = { projectId: number }
 
@@ -88,7 +88,8 @@ export default function ProjectEditorPage({ projectId }: Props) {
   }
 
   // Re-sequence the regular floors (קומה 1, 2, 3…) in each entrance, in order.
-  // Basements (מרתף) and the ground floor (קרקע) are left untouched.
+  // Basements (מרתף) and the ground floor (קרקע) are left untouched. Also
+  // normalizes public-area units: owner = הועד, number = floor number.
   async function renumberFloors() {
     setBusy(true)
     try {
@@ -97,19 +98,36 @@ export default function ProjectEditorPage({ projectId }: Props) {
         for (const entrance of building.children) {
           let n = 0
           for (const floor of entrance.children) {
-            if (floor.name.includes('מרתף') || floor.name.includes('קרקע')) continue
-            n += 1
-            const desired = `קומה ${n}`
-            if (floor.name !== desired) {
-              await ProjectTree.update(projectId, floor.id, { name: desired })
-              renamed += 1
+            const isSpecial = floor.name.includes('מרתף') || floor.name.includes('קרקע')
+            let floorName = floor.name
+            if (!isSpecial) {
+              n += 1
+              const desired = `קומה ${n}`
+              if (floor.name !== desired) {
+                await ProjectTree.update(projectId, floor.id, { name: desired })
+                renamed += 1
+              }
+              floorName = desired
+            }
+            // Fix public-area units on this floor.
+            const numLabel = floorNumberLabel(floorName)
+            for (const u of floor.children) {
+              if (u.unit_type !== 'public_area') continue
+              const wantName = `ציבורי ${numLabel}`.trim()
+              if (u.short_code !== numLabel || u.customer_name !== PUBLIC_OWNER || u.name !== wantName) {
+                await ProjectTree.update(projectId, u.id, {
+                  number: numLabel,
+                  name: wantName,
+                  customer_name: PUBLIC_OWNER,
+                })
+              }
             }
           }
         }
       }
       await alert({
         title: 'מספור קומות מחדש',
-        message: `מוספרו מחדש ${renamed} קומות (ללא מרתף וקומת קרקע).`,
+        message: `מוספרו מחדש ${renamed} קומות (ללא מרתף וקרקע) ויחידות הציבורי עודכנו (בעלים: הועד, מספר = מספר הקומה).`,
         variant: 'success',
       })
       refresh()

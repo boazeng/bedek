@@ -5,6 +5,19 @@ import type { SaleUnitType } from '../../lib/api'
  *  floors re-apply `all` even if its value is unchanged. */
 export type CollapseCmd = { all: boolean; n: number }
 
+/** Public-area units always belong to the house committee. */
+export const PUBLIC_OWNER = 'הועד'
+
+/** The "floor number" used as a public-area unit's number: the digits in the
+ *  floor name (קומה 3 → "3"), or קרקע / מרתף for the special floors. */
+export function floorNumberLabel(floorName: string): string {
+  const m = floorName.match(/(\d+)/)
+  if (m) return m[1]
+  if (floorName.includes('קרקע')) return 'קרקע'
+  if (floorName.includes('מרתף')) return 'מרתף'
+  return floorName
+}
+
 export const UNIT_TYPE_OPTIONS: { value: SaleUnitType; label: string }[] = [
   { value: 'apartment', label: 'דירה' },
   { value: 'parking', label: 'חניה' },

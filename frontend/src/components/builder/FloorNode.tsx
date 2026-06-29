@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react'
 import { ProjectTree, type BulkAddUnitsPayload, type ProjectItemNode } from '../../lib/api'
-import { EditableText, MiniBtn, UNIT_TYPE_LABEL, type CollapseCmd } from './shared'
+import {
+  EditableText,
+  MiniBtn,
+  UNIT_TYPE_LABEL,
+  PUBLIC_OWNER,
+  floorNumberLabel,
+  type CollapseCmd,
+} from './shared'
 import { usePrompt } from '../Dialog'
 import AddUnitsModal from './AddUnitsModal'
 import { UNIT_DRAG_TYPE } from './UnitPalette'
@@ -42,8 +49,16 @@ export default function FloorNode({ projectId, floor, onRefresh, onConfirmDelete
     await ProjectTree.remove(projectId, floor.id)
     onRefresh()
   }
+  // A public-area unit always belongs to the committee and is numbered by floor.
+  function publicFields(floorNumLabel: string) {
+    return { number: floorNumLabel, name: `ציבורי ${floorNumLabel}`.trim(), customer_name: PUBLIC_OWNER }
+  }
   async function addUnits(body: BulkAddUnitsPayload) {
-    await ProjectTree.bulkAddUnits(projectId, floor.id, body)
+    const created = await ProjectTree.bulkAddUnits(projectId, floor.id, body)
+    if (body.unit_type === 'public_area') {
+      const fields = publicFields(floorNumberLabel(floor.name))
+      for (const u of created) await ProjectTree.update(projectId, u.id, fields)
+    }
     onRefresh()
   }
   async function setUnitNumber(u: ProjectItemNode, next: string) {
@@ -65,7 +80,10 @@ export default function FloorNode({ projectId, floor, onRefresh, onConfirmDelete
   }
 
   async function dropUnit(unitType: string) {
-    await ProjectTree.bulkAddUnits(projectId, floor.id, { unit_type: unitType, count: 1 })
+    const created = await ProjectTree.bulkAddUnits(projectId, floor.id, { unit_type: unitType, count: 1 })
+    if (unitType === 'public_area' && created[0]) {
+      await ProjectTree.update(projectId, created[0].id, publicFields(floorNumberLabel(floor.name)))
+    }
     onRefresh()
   }
   // "Duplicate" = add the next floor(s): bump the floor number (קומה 3 → קומה 4,
@@ -86,11 +104,14 @@ export default function FloorNode({ projectId, floor, onRefresh, onConfirmDelete
         await ProjectTree.bulkAddUnits(projectId, created.id, { unit_type: 'apartment', count: apartments })
       }
       for (const u of others) {
-        await ProjectTree.bulkAddUnits(projectId, created.id, {
+        const c = await ProjectTree.bulkAddUnits(projectId, created.id, {
           unit_type: u.unit_type!,
           count: 1,
           number: u.short_code || u.number || null,
         })
+        if (u.unit_type === 'public_area' && c[0]) {
+          await ProjectTree.update(projectId, c[0].id, publicFields(floorNumberLabel(name)))
+        }
       }
     }
     onRefresh()
@@ -220,6 +241,7 @@ export default function FloorNode({ projectId, floor, onRefresh, onConfirmDelete
         <div style={{ padding: '0 10px 8px' }}>
           {units.map((u) => {
             const isStorage = u.unit_type === 'storage'
+            const isPublic = u.unit_type === 'public_area'
             return (
               <div
                 key={u.id}
@@ -235,16 +257,26 @@ export default function FloorNode({ projectId, floor, onRefresh, onConfirmDelete
                   {UNIT_TYPE_LABEL[u.unit_type || ''] || 'יחידה'}
                 </span>
                 <span style={{ fontSize: '0.78rem', color: 'var(--color-text-light)' }}>מס׳</span>
-                <EditableText value={u.short_code || u.number || ''} onSave={(n) => setUnitNumber(u, n)} width={70} />
+                {isPublic ? (
+                  // Public-area number is the floor number — derived, not editable.
+                  <span style={{ fontWeight: 600, minWidth: 40 }}>{u.short_code || u.number || ''}</span>
+                ) : (
+                  <EditableText value={u.short_code || u.number || ''} onSave={(n) => setUnitNumber(u, n)} width={70} />
+                )}
                 {isStorage && (
                   <span style={{ fontSize: '0.78rem', color: 'var(--color-text-light)' }}>שייך לדירה</span>
                 )}
-                <EditableText
-                  value={u.customer_name || ''}
-                  onSave={(n) => setUnitCustomer(u, n)}
-                  placeholder={isStorage ? 'מס׳ דירה…' : 'שם לקוח…'}
-                  width={isStorage ? 110 : 170}
-                />
+                {isPublic ? (
+                  // Public-area owner is always the house committee.
+                  <span style={{ color: 'var(--color-text)' }}>בעלים: {PUBLIC_OWNER}</span>
+                ) : (
+                  <EditableText
+                    value={u.customer_name || ''}
+                    onSave={(n) => setUnitCustomer(u, n)}
+                    placeholder={isStorage ? 'מס׳ דירה…' : 'שם לקוח…'}
+                    width={isStorage ? 110 : 170}
+                  />
+                )}
                 <span style={{ flex: 1 }} />
                 {isStorage && (
                   <MiniBtn onClick={promptDuplicateStorage} title="שכפל מחסן כמה פעמים">
