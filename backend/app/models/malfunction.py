@@ -82,6 +82,9 @@ class Malfunction(Base):
     )
 
     description: Mapped[str] = mapped_column(Text, nullable=False)
+    # Per-unit running defect number (1-based) — combined with the unit's
+    # hierarchical code to form the unique malfunction number for display.
+    seq: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     opened_at: Mapped[date] = mapped_column(Date, default=date.today, nullable=False)
     closed_at: Mapped[date | None] = mapped_column(Date)
     assigned_to: Mapped[str | None] = mapped_column(String(200))
@@ -108,6 +111,8 @@ class MalfunctionActivity(Base):
     malfunction_id: Mapped[int] = mapped_column(
         ForeignKey("malfunctions.id", ondelete="CASCADE"), nullable=False
     )
+    # Per-malfunction running number (1-based) → shown as {malfunction}.{seq}.
+    seq: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     occurred_on: Mapped[date] = mapped_column(Date, default=date.today, nullable=False)
     action: Mapped[str] = mapped_column(String(200), nullable=False)
     notes: Mapped[str | None] = mapped_column(Text)

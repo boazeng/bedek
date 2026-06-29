@@ -330,7 +330,14 @@ function DefectRow({
         <span style={{ color: 'var(--color-primary)', fontSize: '0.8rem' }}>
           {expanded ? '▼' : '◀'}
         </span>
-        <span style={{ fontWeight: 500, fontSize: '0.95rem' }}>{defect.description}</span>
+        <span style={{ fontWeight: 500, fontSize: '0.95rem', display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {defect.number && (
+            <code style={{ fontFamily: 'var(--font-family-en)', fontSize: '0.72rem', color: 'var(--color-primary)' }}>
+              {defect.number}
+            </code>
+          )}
+          <span>{defect.description}</span>
+        </span>
         <span style={{ fontSize: '0.82rem', color: 'var(--color-text-light)' }}>
           {defect.project_item_name || '—'}
         </span>
@@ -389,6 +396,11 @@ function DefectDetailView({ detail }: { detail: MalfunctionDetail }) {
           marginBottom: 16,
         }}
       >
+        <Field label="מספר תקלה">
+          <code style={{ fontFamily: 'var(--font-family-en)', fontSize: '0.82rem', color: 'var(--color-primary)', fontWeight: 700 }}>
+            {detail.number || '—'}
+          </code>
+        </Field>
         <Field label="ישות ספציפית">
           <div>
             <strong>{detail.project_item_name || '—'}</strong>
@@ -441,6 +453,11 @@ function DefectDetailView({ detail }: { detail: MalfunctionDetail }) {
             {detail.activities.map((a) => (
               <li key={a.id} style={{ padding: '8px 0' }}>
                 <div style={{ display: 'flex', gap: 10, alignItems: 'baseline' }}>
+                  {a.number && (
+                    <code style={{ fontFamily: 'var(--font-family-en)', fontSize: '0.74rem', color: 'var(--color-primary)', fontWeight: 700 }}>
+                      {a.number}
+                    </code>
+                  )}
                   <span style={{ fontFamily: 'var(--font-family-en)', fontSize: '0.78rem', color: 'var(--color-text-light)', minWidth: 90 }}>
                     {new Date(a.occurred_on).toLocaleDateString('he-IL')}
                   </span>

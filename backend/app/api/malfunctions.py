@@ -125,6 +125,7 @@ def create_defect(
         description=body.description,
         professional=body.professional or None,
         opened_at=body.opened_at or date.today(),
+        seq=svc.next_defect_seq(db, body.project_id, body.project_item_id),
     )
     db.add(d)
     db.commit()
@@ -155,6 +156,7 @@ def add_activity(
     a = MalfunctionActivity(
         company_id=d.company_id,
         malfunction_id=defect_id,
+        seq=svc.next_activity_seq(db, defect_id),
         occurred_on=body.occurred_on or date.today(),
         action=body.action,
         notes=body.notes or None,
@@ -165,6 +167,8 @@ def add_activity(
     db.refresh(a)
     return MalfunctionActivityOut(
         id=a.id,
+        seq=a.seq,
+        number=None,  # composed in the defect detail view alongside the defect number
         occurred_on=a.occurred_on,
         action=a.action,
         notes=a.notes,

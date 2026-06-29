@@ -26,6 +26,49 @@ from ..schemas.malfunction import (
     MalfunctionListItem,
     UnitWithDefects,
 )
+from . import project_items as tree_svc
+
+
+# ---------- Unique numbering ----------
+
+def _unit_numbers(db: Session, project_id: int) -> dict[int, str]:
+    """Map project_item_id → full hierarchical code (e.g. P00042-B01-E01-F01-01)."""
+    out: dict[int, str] = {}
+
+    def walk(nodes):
+        for n in nodes:
+            if n.number:
+                out[n.id] = n.number
+            walk(n.children)
+
+    walk(tree_svc.get_tree(db, project_id))
+    return out
+
+
+def malfunction_number(unit_number: str | None, project_id: int, seq: int) -> str:
+    """Unique, human-readable defect number: project · unit · running seq."""
+    base = unit_number or f"P{project_id:05d}"
+    return f"{base}-{seq}"
+
+
+def next_defect_seq(db: Session, project_id: int, project_item_id: int | None) -> int:
+    """Next running defect number, scoped to the unit (or the project if no unit)."""
+    q = db.query(func.max(Malfunction.seq)).filter(Malfunction.project_id == project_id)
+    if project_item_id is not None:
+        q = q.filter(Malfunction.project_item_id == project_item_id)
+    else:
+        q = q.filter(Malfunction.project_item_id.is_(None))
+    current = q.scalar()
+    return (current or 0) + 1
+
+
+def next_activity_seq(db: Session, malfunction_id: int) -> int:
+    current = (
+        db.query(func.max(MalfunctionActivity.seq))
+        .filter(MalfunctionActivity.malfunction_id == malfunction_id)
+        .scalar()
+    )
+    return (current or 0) + 1
 
 
 OPEN_STATUSES = (
@@ -252,9 +295,15 @@ def list_defects_for_unit(
         .all()
     )
     loc_name = _location_names(db, [d.location_id for d in defects])
+    unit_numbers = _unit_numbers(db, project_id)
     return [
         MalfunctionListItem(
             id=d.id,
+            number=malfunction_number(
+                unit_numbers.get(d.project_item_id) if d.project_item_id else None,
+                d.project_id,
+                d.seq,
+            ),
             project_item_id=d.project_item_id,
             project_item_name=(
                 items_by_id[d.project_item_id].name
@@ -300,6 +349,10 @@ def get_defect(db: Session, defect_id: int) -> MalfunctionDetail | None:
             .first()
         )
     location_name = _location_names(db, [d.location_id]).get(d.location_id)
+    unit_number = None
+    if d.project_item_id:
+        unit_number = _unit_numbers(db, d.project_id).get(d.project_item_id)
+    number = malfunction_number(unit_number, d.project_id, d.seq)
     acts = (
         db.query(MalfunctionActivity)
         .filter(MalfunctionActivity.malfunction_id == defect_id)
@@ -308,6 +361,7 @@ def get_defect(db: Session, defect_id: int) -> MalfunctionDetail | None:
     )
     return MalfunctionDetail(
         id=d.id,
+        number=number,
         project_id=d.project_id,
         project_item_id=d.project_item_id,
         project_item_name=item.name if item else None,
@@ -327,6 +381,8 @@ def get_defect(db: Session, defect_id: int) -> MalfunctionDetail | None:
         activities=[
             MalfunctionActivityOut(
                 id=a.id,
+                seq=a.seq,
+                number=f"{number}.{a.seq}" if a.seq else None,
                 occurred_on=a.occurred_on,
                 action=a.action,
                 notes=a.notes,

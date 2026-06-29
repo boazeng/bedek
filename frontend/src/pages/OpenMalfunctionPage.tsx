@@ -86,28 +86,16 @@ const GROUP_OPTIONS = [
   { value: 'aluminum', label: 'אלומיניום' },
 ]
 
-type FlatRow = { node: ProjectItemNode; depth: number; pathLabel: string }
-
-function flattenTree(tree: ProjectItemNode[]): FlatRow[] {
-  const out: FlatRow[] = []
-  function walk(n: ProjectItemNode, depth: number, path: string[]) {
-    const here = [...path, n.name]
-    out.push({ node: n, depth, pathLabel: here.join(' / ') })
-    n.children.forEach((c) => walk(c, depth + 1, here))
-  }
-  tree.forEach((n) => walk(n, 0, []))
-  return out
-}
-
-const KIND_ICON: Record<string, string> = {
-  building: '🏢',
-  entrance: '🚪',
-  floor: '🏬',
-  unit: '🏠',
+const UNIT_TYPE_LABEL: Record<string, string> = {
+  apartment: 'דירה',
+  parking: 'חניה',
+  storage: 'מחסן',
+  shop: 'חנות',
+  public_area: 'ציבורי',
 }
 
 export default function OpenMalfunctionPage() {
-  const { user } = useAuth()
+  const { user, activeProject } = useAuth()
   const companyId = useEffectiveCompanyId()
   const alert = useAlert()
   const today = new Date().toISOString().slice(0, 10)
@@ -119,7 +107,9 @@ export default function OpenMalfunctionPage() {
   const [loadingTree, setLoadingTree] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const [projectItemId, setProjectItemId] = useState<number | null>(null)
+  const [buildingId, setBuildingId] = useState<number | null>(null)
+  const [entranceId, setEntranceId] = useState<number | null>(null)
+  const [unitId, setUnitId] = useState<number | null>(null)
   const [locationId, setLocationId] = useState<number | null>(null)
   const [locations, setLocations] = useState<LocationRow[]>([])
   const [trades, setTrades] = useState<CompanyProfessionalRow[]>([])
@@ -137,7 +127,11 @@ export default function OpenMalfunctionPage() {
     Projects.list(cid)
       .then((p) => {
         setProjects(p)
-        if (p.length && !projectId) setProjectId(p[0].id)
+        if (p.length && !projectId) {
+          // Prefer the project the user is actively working on.
+          const active = activeProject && p.find((x) => x.id === activeProject.id)
+          setProjectId(active ? active.id : p[0].id)
+        }
       })
       .catch((e) => setError(String(e)))
     Locations.list(cid)
@@ -151,20 +145,44 @@ export default function OpenMalfunctionPage() {
   useEffect(() => {
     if (!projectId) {
       setTree([])
-      setProjectItemId(null)
+      setBuildingId(null)
+      setEntranceId(null)
+      setUnitId(null)
       return
     }
     setLoadingTree(true)
     ProjectTree.list(projectId)
       .then((t) => {
         setTree(t)
-        setProjectItemId(null)
+        setBuildingId(null)
+        setEntranceId(null)
+        setUnitId(null)
       })
       .catch((e) => setError(String(e)))
       .finally(() => setLoadingTree(false))
   }, [projectId])
 
-  const flat = useMemo(() => flattenTree(tree), [tree])
+  // Cascading drill-down: building → entrance → unit.
+  const buildings = useMemo(() => tree.filter((n) => n.kind === 'building'), [tree])
+  const entrances = useMemo(() => {
+    const b = buildings.find((x) => x.id === buildingId)
+    return b ? b.children.filter((n) => n.kind === 'entrance') : []
+  }, [buildings, buildingId])
+  const units = useMemo(() => {
+    const b = buildings.find((x) => x.id === buildingId)
+    const e = b?.children.find((x) => x.id === entranceId)
+    if (!e) return [] as { node: ProjectItemNode; floor: string }[]
+    const out: { node: ProjectItemNode; floor: string }[] = []
+    for (const floor of e.children) {
+      for (const u of floor.children) {
+        if (u.kind === 'unit') out.push({ node: u, floor: floor.name })
+      }
+    }
+    return out
+  }, [buildings, buildingId, entranceId])
+
+  // Most specific chosen node is what the defect attaches to.
+  const effectiveItemId = unitId ?? entranceId ?? buildingId
 
   function resetForm() {
     setDescription('')
@@ -173,7 +191,9 @@ export default function OpenMalfunctionPage() {
     setSource('manual')
     setProfessional('')
     setOpenedAt(today)
-    setProjectItemId(null)
+    setBuildingId(null)
+    setEntranceId(null)
+    setUnitId(null)
     setLocationId(null)
   }
 
@@ -190,7 +210,7 @@ export default function OpenMalfunctionPage() {
     try {
       await Malfunctions.create({
         project_id: projectId,
-        project_item_id: projectItemId,
+        project_item_id: effectiveItemId,
         location_id: locationId,
         description: description.trim(),
         status,
@@ -252,33 +272,65 @@ export default function OpenMalfunctionPage() {
           </select>
         </Field>
 
-        <Field
-          label="מיקום בפרויקט"
-          hint="הישות שאליה משויכת התקלה (בניין / קומה / יחידה / מיקום). ניתן להשאיר ריק לתקלה כללית בפרויקט."
-        >
-          {loadingTree ? (
-            <div style={{ color: 'var(--color-text-light)', fontSize: '0.85rem' }}>טוען עץ פרויקט…</div>
-          ) : flat.length === 0 ? (
-            <div style={{ color: 'var(--color-text-light)', fontSize: '0.85rem' }}>
-              {projectId ? 'אין ישויות בפרויקט זה' : 'בחר פרויקט תחילה'}
-            </div>
-          ) : (
-            <select
-              style={strongInputStyle}
-              value={projectItemId ?? ''}
-              onChange={(e) => setProjectItemId(e.target.value ? Number(e.target.value) : null)}
-            >
-              <option value="">— כללי לפרויקט —</option>
-              {flat.map(({ node, depth, pathLabel }) => (
-                <option key={node.id} value={node.id}>
-                  {' '.repeat(depth * 3)}
-                  {KIND_ICON[node.kind] || '•'} {pathLabel}
-                  {node.short_code ? `  ·  ${node.short_code}` : ''}
-                </option>
-              ))}
-            </select>
-          )}
-        </Field>
+        {loadingTree ? (
+          <div style={{ color: 'var(--color-text-light)', fontSize: '0.85rem', marginBottom: 16 }}>
+            טוען עץ פרויקט…
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+            <Field label="בניין">
+              <select
+                style={strongInputStyle}
+                value={buildingId ?? ''}
+                onChange={(e) => {
+                  setBuildingId(e.target.value ? Number(e.target.value) : null)
+                  setEntranceId(null)
+                  setUnitId(null)
+                }}
+              >
+                <option value="">— בחר בניין —</option>
+                {buildings.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="כניסה">
+              <select
+                style={strongInputStyle}
+                value={entranceId ?? ''}
+                disabled={!buildingId}
+                onChange={(e) => {
+                  setEntranceId(e.target.value ? Number(e.target.value) : null)
+                  setUnitId(null)
+                }}
+              >
+                <option value="">— בחר כניסה —</option>
+                {entrances.map((en) => (
+                  <option key={en.id} value={en.id}>
+                    {en.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="יחידה" hint="דירה / חניה / מחסן / חנות / ציבורי">
+              <select
+                style={strongInputStyle}
+                value={unitId ?? ''}
+                disabled={!entranceId}
+                onChange={(e) => setUnitId(e.target.value ? Number(e.target.value) : null)}
+              >
+                <option value="">— כל הכניסה —</option>
+                {units.map(({ node, floor }) => (
+                  <option key={node.id} value={node.id}>
+                    {UNIT_TYPE_LABEL[node.unit_type || ''] || 'יחידה'} {node.short_code || node.number || ''} · {floor}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+        )}
 
         <Field
           label="מיקום (סיווג)"

@@ -35,6 +35,8 @@ class MalfunctionActivityOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    seq: int = 0
+    number: str | None = None   # composed: {malfunction number}.{seq}
     occurred_on: date
     action: str
     notes: str | None
@@ -49,6 +51,7 @@ class MalfunctionListItem(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    number: str | None = None
     project_item_id: int | None
     project_item_name: str | None = None
     location_id: int | None = None
@@ -68,6 +71,7 @@ class MalfunctionDetail(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    number: str | None = None
     project_id: int
     project_item_id: int | None
     project_item_name: str | None = None

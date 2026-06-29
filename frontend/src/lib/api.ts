@@ -266,6 +266,8 @@ export type UnitWithDefects = {
 
 export type MalfunctionActivity = {
   id: number
+  seq: number
+  number: string | null   // composed {malfunction number}.{seq}
   occurred_on: string
   action: string
   notes: string | null
@@ -275,6 +277,7 @@ export type MalfunctionActivity = {
 
 export type MalfunctionListRow = {
   id: number
+  number: string | null
   project_item_id: number | null
   project_item_name: string | null
   location_id: number | null
@@ -290,6 +293,7 @@ export type MalfunctionListRow = {
 
 export type MalfunctionDetail = {
   id: number
+  number: string | null
   project_id: number
   project_item_id: number | null
   project_item_name: string | null
