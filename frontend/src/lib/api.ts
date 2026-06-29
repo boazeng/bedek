@@ -403,6 +403,15 @@ export const Users = {
 }
 
 export const Crm = {
+  /** CRM companies for the import picker (each flagged if already linked). super_admin. */
+  companies: () =>
+    api<{ id: number; name: string; linked: boolean }[]>('/api/crm/companies'),
+  /** Create/link the chosen CRM companies into bedek (curated). super_admin. */
+  importCompanies: (ids: number[]) =>
+    api<{ created: number; updated: number; skipped: number }>(
+      '/api/crm/import-companies',
+      { method: 'POST', body: { ids } },
+    ),
   /** Integration status + a whoami check against the linked CRM tenant. */
   status: (companyId?: number) =>
     api<CrmStatus>('/api/crm/status', { query: { company_id: companyId } }),

@@ -24,13 +24,13 @@ def is_configured() -> bool:
     return bool(settings.crm_base_url and settings.crm_service_key)
 
 
-def _get(path: str, company_id: int, *, search: str | None = None, timeout: float = 30.0):
+def _request(path: str, params: dict, *, timeout: float = 30.0):
     if not is_configured():
         raise CrmError("CRM integration is not configured (missing base URL or service key)")
-    params = {"company_id": company_id}
-    if search:
-        params["search"] = search
-    url = f"{settings.crm_base_url.rstrip('/')}{path}?{urllib.parse.urlencode(params)}"
+    qs = urllib.parse.urlencode({k: v for k, v in params.items() if v is not None})
+    url = f"{settings.crm_base_url.rstrip('/')}{path}"
+    if qs:
+        url = f"{url}?{qs}"
     req = urllib.request.Request(url, headers={"X-Service-Key": settings.crm_service_key})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
@@ -40,6 +40,15 @@ def _get(path: str, company_id: int, *, search: str | None = None, timeout: floa
         raise CrmError(f"CRM returned HTTP {e.code}: {detail}") from e
     except urllib.error.URLError as e:
         raise CrmError(f"Could not reach CRM at {settings.crm_base_url}: {e.reason}") from e
+
+
+def _get(path: str, company_id: int, *, search: str | None = None):
+    return _request(path, {"company_id": company_id, "search": search})
+
+
+def list_companies() -> list[dict]:
+    """All active CRM companies — [{id, name}]. Cross-tenant (key-only)."""
+    return _request("/api/service/companies", {})
 
 
 def get_company(company_id: int) -> dict:

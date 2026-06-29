@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Companies, type Company } from '../lib/api'
+import { Companies, Crm, type Company } from '../lib/api'
 import DataTable from '../components/DataTable'
 import Modal, { Field, inputStyle } from '../components/Modal'
-import { useConfirm } from '../components/Dialog'
+import { useAlert, useConfirm } from '../components/Dialog'
 
 type FormState = Omit<Company, 'id' | 'created_at'>
 
@@ -17,6 +17,12 @@ const EMPTY_FORM: FormState = {
 
 export default function CompaniesPage() {
   const confirm = useConfirm()
+  const alert = useAlert()
+  const [syncing, setSyncing] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [loadingCrm, setLoadingCrm] = useState(false)
+  const [crmList, setCrmList] = useState<{ id: number; name: string; linked: boolean }[]>([])
+  const [selected, setSelected] = useState<Set<number>>(new Set())
   const [rows, setRows] = useState<Company[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -66,6 +72,45 @@ export default function CompaniesPage() {
     }
   }
 
+  async function openPicker() {
+    setPickerOpen(true)
+    setLoadingCrm(true)
+    setSelected(new Set())
+    try {
+      setCrmList(await Crm.companies())
+    } catch (e) {
+      setPickerOpen(false)
+      alert({ title: 'שגיאה', message: `לא ניתן לטעון חברות מ-CRM: ${String(e)}`, variant: 'danger' })
+    } finally {
+      setLoadingCrm(false)
+    }
+  }
+  function toggleSelect(id: number) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+  async function importSelected() {
+    if (selected.size === 0) return
+    setSyncing(true)
+    try {
+      const res = await Crm.importCompanies([...selected])
+      setPickerOpen(false)
+      await alert({
+        title: 'ייבוא חברות הושלם',
+        message: `נוצרו: ${res.created} · עודכנו: ${res.updated}${res.skipped ? ` · דולגו: ${res.skipped}` : ''}`,
+        variant: 'success',
+      })
+      load()
+    } catch (e) {
+      alert({ title: 'שגיאת ייבוא', message: String(e), variant: 'danger' })
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   async function remove(c: Company) {
     const ok = await confirm({
       title: 'השבתת חברה',
@@ -89,9 +134,18 @@ export default function CompaniesPage() {
             יצירה, עריכה והשבתה של חברות-לקוח
           </div>
         </div>
-        <button onClick={openCreate} className="tact-btn tact-btn-primary">
-          + חברה חדשה
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            onClick={openPicker}
+            className="tact-btn tact-btn-ghost"
+            title="בחר אילו חברות לייבא מ-TACT-CRM"
+          >
+            + הוסף חברות מ-CRM
+          </button>
+          <button onClick={openCreate} className="tact-btn tact-btn-primary">
+            + חברה חדשה
+          </button>
+        </div>
       </div>
 
       {error && <div style={{ color: 'var(--color-accent)', marginBottom: 10 }}>{error}</div>}
@@ -104,6 +158,18 @@ export default function CompaniesPage() {
           columns={[
             { header: 'שם', key: 'name' },
             { header: 'מזהה (slug)', key: 'slug', render: (r) => <code style={{ fontFamily: 'var(--font-family-en)' }}>{r.slug}</code> },
+            {
+              header: 'מקור',
+              key: 'crm_company_id',
+              render: (r) =>
+                r.crm_company_id ? (
+                  <span className="tact-badge tact-badge-on" title={`CRM company ${r.crm_company_id}`}>
+                    מ-CRM
+                  </span>
+                ) : (
+                  <span style={{ color: 'var(--color-text-light)', fontSize: '0.8rem' }}>מקומי</span>
+                ),
+            },
             { header: 'איש קשר', key: 'contact_email' },
             { header: 'טלפון', key: 'phone' },
             {
@@ -198,6 +264,66 @@ export default function CompaniesPage() {
           />
         </Field>
         {saveErr && <div style={{ color: 'var(--color-accent)' }}>{saveErr}</div>}
+      </Modal>
+
+      <Modal
+        open={pickerOpen}
+        title="הוספת חברות מ-TACT-CRM"
+        onClose={() => setPickerOpen(false)}
+        footer={
+          <>
+            <button className="tact-btn tact-btn-ghost" onClick={() => setPickerOpen(false)}>
+              ביטול
+            </button>
+            <button
+              className="tact-btn tact-btn-primary"
+              onClick={importSelected}
+              disabled={syncing || selected.size === 0}
+            >
+              {syncing ? 'מייבא…' : `הוסף (${selected.size})`}
+            </button>
+          </>
+        }
+      >
+        <div style={{ fontSize: '0.82rem', color: 'var(--color-text-light)', marginBottom: 10 }}>
+          סמן את החברות הרלוונטיות לבדק. חברות שכבר מקושרות מסומנות כ"מקושר".
+        </div>
+        {loadingCrm ? (
+          <div style={{ color: 'var(--color-text-light)' }}>טוען חברות מ-CRM…</div>
+        ) : crmList.length === 0 ? (
+          <div style={{ color: 'var(--color-text-light)' }}>אין חברות ב-CRM.</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 360, overflowY: 'auto' }}>
+            {crmList.map((c) => (
+              <label
+                key={c.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '8px 10px',
+                  borderRadius: 8,
+                  border: '1px solid var(--color-border)',
+                  background: 'var(--color-bg)',
+                  cursor: c.linked ? 'default' : 'pointer',
+                  opacity: c.linked ? 0.6 : 1,
+                }}
+              >
+                <input
+                  type="checkbox"
+                  disabled={c.linked}
+                  checked={c.linked || selected.has(c.id)}
+                  onChange={() => toggleSelect(c.id)}
+                />
+                <span style={{ flex: 1, fontSize: '0.9rem' }}>{c.name}</span>
+                <span style={{ fontSize: '0.72rem', color: 'var(--color-text-light)', fontFamily: 'var(--font-family-en)' }}>
+                  #{c.id}
+                </span>
+                {c.linked && <span className="tact-badge tact-badge-on">מקושר</span>}
+              </label>
+            ))}
+          </div>
+        )}
       </Modal>
     </div>
   )

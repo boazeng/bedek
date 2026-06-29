@@ -4,15 +4,57 @@ Company-scoped: super_admin must pass `company_id`; company_admin is locked to
 their own. The CRM service secret lives only in server config — never exposed.
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ..deps import get_db, require_company_admin
+from ..deps import get_db, require_company_admin, require_super_admin
 from ..integrations import crm_client
 from ..models import Company, User, UserRole
 from ..services import crm_sync
 
 
 router = APIRouter(prefix="/api/crm", tags=["crm-integration"])
+
+
+class ImportCompaniesRequest(BaseModel):
+    ids: list[int]
+
+
+def _require_configured():
+    if not crm_client.is_configured():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="CRM integration is not configured",
+        )
+
+
+@router.get("/companies")
+def crm_companies(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_super_admin),
+):
+    """List CRM companies for the import picker (each marked if already linked).
+    Super-admin only."""
+    _require_configured()
+    try:
+        return crm_sync.list_crm_companies(db)
+    except crm_client.CrmError as e:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(e))
+
+
+@router.post("/import-companies")
+def import_companies(
+    body: ImportCompaniesRequest,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_super_admin),
+):
+    """Create/link the chosen CRM companies into bedek (curated — no mass
+    deactivation). Super-admin only."""
+    _require_configured()
+    try:
+        return crm_sync.import_companies(db, body.ids)
+    except crm_client.CrmError as e:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(e))
 
 
 def _resolve_company(actor: User, requested: int | None, db: Session) -> Company:
