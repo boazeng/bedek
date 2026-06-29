@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ProjectTree, type Buyer, type BulkAddUnitsPayload, type ProjectItemNode } from '../../lib/api'
+import { ProjectTree, type CrmCustomer, type BulkAddUnitsPayload, type ProjectItemNode } from '../../lib/api'
 import {
   EditableText,
   MiniBtn,
@@ -12,6 +12,7 @@ import {
 } from './shared'
 import { usePrompt } from '../Dialog'
 import AddUnitsModal from './AddUnitsModal'
+import UnitCustomersModal from './UnitCustomersModal'
 import { UNIT_DRAG_TYPE } from './UnitPalette'
 
 type Props = {
@@ -20,7 +21,7 @@ type Props = {
   onRefresh: () => void
   onConfirmDelete: (label: string) => Promise<boolean>
   collapseCmd?: CollapseCmd
-  buyers?: Buyer[]
+  customers?: CrmCustomer[]
 }
 
 /** Ask the user for a repeat count (≥1) via the prompt dialog. Null = cancelled. */
@@ -31,12 +32,19 @@ async function askCount(prompt: ReturnType<typeof usePrompt>, title: string, mes
   return Number.isFinite(n) && n >= 1 ? n : null
 }
 
-export default function FloorNode({ projectId, floor, onRefresh, onConfirmDelete, collapseCmd, buyers = [] }: Props) {
+export default function FloorNode({ projectId, floor, onRefresh, onConfirmDelete, collapseCmd, customers = [] }: Props) {
   const prompt = usePrompt()
   const [addOpen, setAddOpen] = useState(false)
   const [dragOver, setDragOver] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
+  const [customersFor, setCustomersFor] = useState<ProjectItemNode | null>(null)
   const units = floor.children
+
+  // Resolve CRM customer membership ids → display names.
+  const customerName = (id: number) => {
+    const c = customers.find((x) => x.membership_id === id)
+    return c ? c.full_name : `לקוח #${id}`
+  }
 
   // Per-type breakdown, only for types that exist on the floor.
   const unitSummary = UNIT_TYPE_OPTIONS.map((o) => ({
@@ -85,8 +93,8 @@ export default function FloorNode({ projectId, floor, onRefresh, onConfirmDelete
     await ProjectTree.update(projectId, u.id, { customer_name: next })
     onRefresh()
   }
-  async function setUnitBuyer(u: ProjectItemNode, buyerId: number | null) {
-    await ProjectTree.update(projectId, u.id, { buyer_id: buyerId })
+  async function saveUnitCustomers(u: ProjectItemNode, membershipIds: number[]) {
+    await ProjectTree.setUnitCustomers(projectId, u.id, membershipIds)
     onRefresh()
   }
   async function removeUnit(u: ProjectItemNode) {
@@ -293,29 +301,24 @@ export default function FloorNode({ projectId, floor, onRefresh, onConfirmDelete
                     width={110}
                   />
                 ) : (
-                  // Apartment / parking / shop: pick the customer from the project's buyers.
-                  <select
-                    value={u.buyer_id ?? ''}
-                    onChange={(e) => setUnitBuyer(u, e.target.value ? Number(e.target.value) : null)}
+                  // Apartment / parking / shop: one or more customers from CRM.
+                  <button
+                    type="button"
+                    onClick={() => setCustomersFor(u)}
+                    className="tact-btn tact-btn-ghost"
+                    title="בחר לקוח/ים מתוך לקוחות החברה ב-CRM"
                     style={{
-                      font: 'inherit',
+                      padding: '4px 10px',
                       fontSize: '0.82rem',
-                      padding: '4px 8px',
-                      borderRadius: 6,
-                      border: '1px solid var(--color-border)',
-                      background: 'var(--color-bg-white)',
-                      color: 'var(--color-text)',
                       minWidth: 180,
+                      textAlign: 'start',
+                      color: u.customer_membership_ids.length ? 'var(--color-text)' : 'var(--color-text-light)',
                     }}
                   >
-                    <option value="">— ללא לקוח —</option>
-                    {buyers.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.name}
-                        {b.nickname ? ` (${b.nickname})` : ''}
-                      </option>
-                    ))}
-                  </select>
+                    {u.customer_membership_ids.length
+                      ? u.customer_membership_ids.map(customerName).join(', ')
+                      : '+ שייך לקוח'}
+                  </button>
                 )}
                 <span style={{ flex: 1 }} />
                 {isStorage && (
@@ -337,6 +340,15 @@ export default function FloorNode({ projectId, floor, onRefresh, onConfirmDelete
         floorName={floor.name}
         onClose={() => setAddOpen(false)}
         onAdd={addUnits}
+      />
+
+      <UnitCustomersModal
+        open={customersFor !== null}
+        unitLabel={customersFor ? `${UNIT_TYPE_LABEL[customersFor.unit_type || ''] || 'יחידה'} ${customersFor.short_code || customersFor.number || ''}` : ''}
+        customers={customers}
+        selectedIds={customersFor?.customer_membership_ids || []}
+        onClose={() => setCustomersFor(null)}
+        onSave={(ids) => saveUnitCustomers(customersFor!, ids)}
       />
     </div>
   )

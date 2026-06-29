@@ -13,7 +13,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from ..models import Buyer, ProjectItem, ProjectItemKind, SaleUnitType
+from ..models import Buyer, ProjectItem, ProjectItemKind, SaleUnitType, UnitCustomer
 from ..schemas.project_item import ProjectItemNode
 
 
@@ -70,6 +70,13 @@ def get_tree(db: Session, project_id: int) -> list[ProjectItemNode]:
         for b in db.query(Buyer).filter(Buyer.id.in_(buyer_ids)).all():
             buyer_names[b.id] = b.display_name
 
+    # CRM customer links per unit (many-to-many), in one query.
+    item_ids = [r.id for r in rows]
+    customers_by_item: dict[int, list[int]] = defaultdict(list)
+    if item_ids:
+        for uc in db.query(UnitCustomer).filter(UnitCustomer.project_item_id.in_(item_ids)).all():
+            customers_by_item[uc.project_item_id].append(uc.crm_membership_id)
+
     project_code = f"P{project_id:05d}"
 
     def build(
@@ -116,6 +123,7 @@ def get_tree(db: Session, project_id: int) -> list[ProjectItemNode]:
                 customer_name=r.customer_name,
                 buyer_id=r.buyer_id,
                 buyer_name=buyer_names.get(r.buyer_id) if r.buyer_id else None,
+                customer_membership_ids=customers_by_item.get(r.id, []),
                 floor_name=shown_floor_name,
                 children=build(r.id, full_number, child_floor_name),
             )

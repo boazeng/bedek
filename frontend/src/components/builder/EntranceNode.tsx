@@ -1,4 +1,4 @@
-import { ProjectTree, type Buyer, type ProjectItemNode } from '../../lib/api'
+import { ProjectTree, type CrmCustomer, type ProjectItemNode } from '../../lib/api'
 import { EditableText, MiniBtn, type CollapseCmd } from './shared'
 import FloorNode from './FloorNode'
 
@@ -8,10 +8,10 @@ type Props = {
   onRefresh: () => void
   onConfirmDelete: (label: string) => Promise<boolean>
   collapseCmd?: CollapseCmd
-  buyers?: Buyer[]
+  customers?: CrmCustomer[]
 }
 
-export default function EntranceNode({ projectId, entrance, onRefresh, onConfirmDelete, collapseCmd, buyers }: Props) {
+export default function EntranceNode({ projectId, entrance, onRefresh, onConfirmDelete, collapseCmd, customers }: Props) {
   const floors = entrance.children
 
   async function rename(next: string) {
@@ -100,7 +100,7 @@ export default function EntranceNode({ projectId, entrance, onRefresh, onConfirm
               onRefresh={onRefresh}
               onConfirmDelete={onConfirmDelete}
               collapseCmd={collapseCmd}
-              buyers={buyers}
+              customers={customers}
             />
           ))
         )}

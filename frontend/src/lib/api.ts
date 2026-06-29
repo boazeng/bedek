@@ -175,6 +175,16 @@ export type Buyer = {
   phone: string | null
 }
 
+/** A customer as it lives in TACT-CRM (the system of record). Referenced by
+ *  `membership_id` (company-scoped stable id). */
+export type CrmCustomer = {
+  membership_id: number
+  customer_number: string | null
+  full_name: string
+  nickname: string | null
+  phone: string | null
+}
+
 export type ProjectItemKind = 'building' | 'entrance' | 'floor' | 'unit'
 
 /** Sale-unit type (only meaningful on kind='unit' rows). */
@@ -196,9 +206,11 @@ export type ProjectItemNode = {
   permanent_apt_number: string | null
   /** Free-text customer label — shown next to the row name. */
   customer_name: string | null
-  /** Linked buyer (the unit's customer), if any. */
+  /** Linked buyer (legacy local link — unused by the CRM-customer flow). */
   buyer_id: number | null
   buyer_name: string | null
+  /** CRM customer membership ids linked to this unit (many-to-many). */
+  customer_membership_ids: number[]
   /** Name of the ancestor floor — null for buildings and floors themselves. */
   floor_name: string | null
   children: ProjectItemNode[]
@@ -444,6 +456,30 @@ export const Crm = {
       '/api/crm/sync-projects',
       { method: 'POST', query: { company_id: companyId } },
     ),
+  /** The company's customers from CRM (system of record). */
+  customers: (opts: { companyId?: number; search?: string } = {}) =>
+    api<CrmCustomer[]>('/api/crm/customers', {
+      query: { company_id: opts.companyId, search: opts.search },
+    }),
+  createCustomer: (body: CrmCustomerInput, companyId?: number) =>
+    api<CrmCustomer>('/api/crm/customers', {
+      method: 'POST',
+      body,
+      query: { company_id: companyId },
+    }),
+  updateCustomer: (membershipId: number, body: CrmCustomerInput, companyId?: number) =>
+    api<CrmCustomer>(`/api/crm/customers/${membershipId}`, {
+      method: 'PUT',
+      body,
+      query: { company_id: companyId },
+    }),
+}
+
+export type CrmCustomerInput = {
+  full_name: string
+  nickname?: string | null
+  phone?: string | null
+  customer_number?: string | null
 }
 
 export const Projects = {
@@ -495,6 +531,12 @@ export const ProjectTree = {
   renumber: (projectId: number) =>
     api<{ renumbered: number }>(`/api/projects/${projectId}/tree/renumber`, {
       method: 'POST',
+    }),
+  /** Replace the CRM customers linked to a unit (many-to-many). */
+  setUnitCustomers: (projectId: number, unitId: number, membershipIds: number[]) =>
+    api<ProjectItemNode>(`/api/projects/${projectId}/tree/items/${unitId}/customers`, {
+      method: 'PUT',
+      body: { membership_ids: membershipIds },
     }),
 }
 

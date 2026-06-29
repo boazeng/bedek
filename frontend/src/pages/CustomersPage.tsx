@@ -1,25 +1,26 @@
 import { useEffect, useState } from 'react'
-import { Buyers, type Buyer } from '../lib/api'
+import { Crm, type CrmCustomer } from '../lib/api'
 import DataTable from '../components/DataTable'
 import Modal, { Field, inputStyle } from '../components/Modal'
 import { useAuth, useEffectiveCompanyId } from '../lib/AuthContext'
-import { useConfirm } from '../components/Dialog'
 
-type FormState = { name: string; nickname: string; phone: string }
-const EMPTY_FORM: FormState = { name: '', nickname: '', phone: '' }
+type FormState = { full_name: string; nickname: string; phone: string; customer_number: string }
+const EMPTY_FORM: FormState = { full_name: '', nickname: '', phone: '', customer_number: '' }
 
+/** Customers (לקוחות) live in TACT-CRM (system of record). This page reads them
+ *  from CRM and writes new/edited customers back to CRM. */
 export default function CustomersPage() {
-  const { user, activeProject } = useAuth()
+  const { user } = useAuth()
   const companyId = useEffectiveCompanyId()
-  const confirm = useConfirm()
   const isAdmin = user?.role === 'super_admin' || user?.role === 'company_admin'
   const cid = user?.role === 'super_admin' ? companyId ?? undefined : undefined
 
-  const [rows, setRows] = useState<Buyer[]>([])
+  const [rows, setRows] = useState<CrmCustomer[]>([])
+  const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
-  const [editing, setEditing] = useState<Buyer | null>(null)
+  const [editing, setEditing] = useState<CrmCustomer | null>(null)
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [saveErr, setSaveErr] = useState<string | null>(null)
 
@@ -32,12 +33,13 @@ export default function CustomersPage() {
       return
     }
     setLoading(true)
-    Buyers.list({ companyId: cid, projectId: activeProject?.id })
+    setError(null)
+    Crm.customers({ companyId: cid, search: search.trim() || undefined })
       .then(setRows)
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false))
   }
-  useEffect(load, [user?.role, companyId, activeProject?.id])
+  useEffect(load, [user?.role, companyId])
 
   function openCreate() {
     setEditing(null)
@@ -45,45 +47,38 @@ export default function CustomersPage() {
     setSaveErr(null)
     setOpen(true)
   }
-  function openEdit(b: Buyer) {
-    setEditing(b)
-    setForm({ name: b.name, nickname: b.nickname || '', phone: b.phone || '' })
+  function openEdit(c: CrmCustomer) {
+    setEditing(c)
+    setForm({
+      full_name: c.full_name,
+      nickname: c.nickname || '',
+      phone: c.phone || '',
+      customer_number: c.customer_number || '',
+    })
     setSaveErr(null)
     setOpen(true)
   }
 
   async function save() {
     setSaveErr(null)
-    if (!form.name.trim()) {
+    if (!form.full_name.trim()) {
       setSaveErr('נא להזין שם לקוח')
       return
     }
     const body = {
-      name: form.name.trim(),
+      full_name: form.full_name.trim(),
       nickname: form.nickname.trim() || null,
       phone: form.phone.trim() || null,
-      project_id: activeProject?.id ?? null,
+      customer_number: form.customer_number.trim() || null,
     }
     try {
-      if (editing) await Buyers.update(editing.id, body)
-      else await Buyers.create(body, cid)
+      if (editing) await Crm.updateCustomer(editing.membership_id, body, cid)
+      else await Crm.createCustomer(body, cid)
       setOpen(false)
       load()
     } catch (e) {
       setSaveErr(String(e))
     }
-  }
-
-  async function remove(b: Buyer) {
-    const ok = await confirm({
-      title: 'מחיקת לקוח',
-      message: `למחוק את הלקוח "${b.name}"?`,
-      variant: 'danger',
-      confirmLabel: 'מחק',
-    })
-    if (!ok) return
-    await Buyers.remove(b.id)
-    load()
   }
 
   if (needsCompany) {
@@ -96,22 +91,33 @@ export default function CustomersPage() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, gap: 12 }}>
         <div>
           <h2 style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--color-primary)' }}>
             לקוחות
           </h2>
           <div style={{ fontSize: '0.85rem', color: 'var(--color-text-light)' }}>
-            {activeProject
-              ? `לקוחות הפרויקט "${activeProject.name}"`
-              : 'כל לקוחות החברה — בחר פרויקט פעיל כדי לסנן לפי פרויקט'}
+            לקוחות החברה מתוך TACT-CRM — השיוך לפרויקט ולדירה נעשה בבונה המבנה
           </div>
         </div>
         {isAdmin && (
-          <button onClick={openCreate} className="tact-btn tact-btn-primary">
+          <button onClick={openCreate} className="tact-btn tact-btn-primary" style={{ alignSelf: 'flex-start' }}>
             + לקוח חדש
           </button>
         )}
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+        <input
+          style={{ ...inputStyle, maxWidth: 320 }}
+          value={search}
+          placeholder="חיפוש לפי שם / מספר…"
+          onChange={(e) => setSearch(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && load()}
+        />
+        <button className="tact-btn tact-btn-ghost" onClick={load}>
+          חיפוש
+        </button>
       </div>
 
       {error && <div style={{ color: 'var(--color-accent)', marginBottom: 10 }}>{error}</div>}
@@ -120,17 +126,17 @@ export default function CustomersPage() {
       ) : (
         <DataTable
           rows={rows}
-          rowKey={(r) => r.id}
+          rowKey={(r) => r.membership_id}
           columns={[
-            { header: 'מס׳ לקוח', key: 'id', width: 90 },
-            { header: 'שם הלקוח', key: 'name' },
+            { header: 'מס׳ לקוח', key: 'customer_number', render: (r) => r.customer_number || r.membership_id },
+            { header: 'שם הלקוח', key: 'full_name' },
             { header: 'כינוי', key: 'nickname', render: (r) => r.nickname || '—' },
             { header: 'טלפון', key: 'phone', render: (r) => r.phone || '—' },
           ]}
           actions={
             isAdmin
               ? (r) => (
-                  <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                     <button
                       onClick={() => openEdit(r)}
                       className="tact-btn tact-btn-ghost"
@@ -138,18 +144,11 @@ export default function CustomersPage() {
                     >
                       עריכה
                     </button>
-                    <button
-                      onClick={() => remove(r)}
-                      className="tact-btn tact-btn-ghost"
-                      style={{ padding: '6px 12px', fontSize: '0.78rem', color: 'var(--color-accent)' }}
-                    >
-                      מחק
-                    </button>
                   </div>
                 )
               : undefined
           }
-          empty={activeProject ? 'אין עדיין לקוחות לפרויקט זה.' : 'אין עדיין לקוחות.'}
+          empty="אין לקוחות להצגה."
         />
       )}
 
@@ -163,13 +162,13 @@ export default function CustomersPage() {
               ביטול
             </button>
             <button className="tact-btn tact-btn-primary" onClick={save}>
-              שמור
+              שמור ל-CRM
             </button>
           </>
         }
       >
         <Field label="שם הלקוח">
-          <input style={inputStyle} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          <input style={inputStyle} value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
         </Field>
         <Field label="כינוי">
           <input style={inputStyle} value={form.nickname} onChange={(e) => setForm({ ...form, nickname: e.target.value })} />
@@ -177,11 +176,12 @@ export default function CustomersPage() {
         <Field label="טלפון">
           <input style={inputStyle} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
         </Field>
-        {!activeProject && (
-          <div style={{ fontSize: '0.78rem', color: 'var(--color-text-light)' }}>
-            לא נבחר פרויקט — הלקוח יישמר לחברה ללא שיוך לפרויקט.
-          </div>
-        )}
+        <Field label="מספר לקוח (אופציונלי)">
+          <input style={inputStyle} value={form.customer_number} onChange={(e) => setForm({ ...form, customer_number: e.target.value })} />
+        </Field>
+        <div style={{ fontSize: '0.78rem', color: 'var(--color-text-light)' }}>
+          הלקוח נשמר ב-TACT-CRM (מקור האמת ללקוחות).
+        </div>
         {saveErr && <div style={{ color: 'var(--color-accent)' }}>{saveErr}</div>}
       </Modal>
     </div>

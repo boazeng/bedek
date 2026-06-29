@@ -9,7 +9,9 @@ from ..deps import (
     require_company_admin,
     user_can_access_project,
 )
-from ..models import Buyer, Project, ProjectItem, User
+from pydantic import BaseModel
+
+from ..models import Buyer, Project, ProjectItem, UnitCustomer, User
 from ..schemas.project_item import (
     BulkAddUnitsRequest,
     DuplicateResponse,
@@ -18,6 +20,12 @@ from ..schemas.project_item import (
     ProjectItemUpdate,
     ReorderRequest,
 )
+
+
+class SetCustomersRequest(BaseModel):
+    """Replace the full set of CRM customer links on a unit."""
+
+    membership_ids: list[int]
 from ..services import project_items as svc
 
 
@@ -196,6 +204,36 @@ def add_units_to_floor(
     )
     db.commit()
     return [_node(c) for c in created]
+
+
+@router.put("/items/{item_id}/customers", response_model=ProjectItemNode)
+def set_unit_customers(
+    project_id: int,
+    item_id: int,
+    body: SetCustomersRequest,
+    db: Session = Depends(get_db),
+    actor: User = Depends(require_company_admin),
+):
+    """Replace the unit's CRM customer links (many-to-many)."""
+    project = _get_project_for_write(project_id, actor, db)
+    item = _item_in_project(db, project_id, item_id)
+    db.query(UnitCustomer).filter(UnitCustomer.project_item_id == item.id).delete()
+    seen: set[int] = set()
+    for mid in body.membership_ids:
+        if mid in seen:
+            continue
+        seen.add(mid)
+        db.add(
+            UnitCustomer(
+                company_id=project.company_id,
+                project_item_id=item.id,
+                crm_membership_id=mid,
+            )
+        )
+    db.commit()
+    node = _node(item)
+    node.customer_membership_ids = sorted(seen)
+    return node
 
 
 @router.post("/renumber", status_code=status.HTTP_200_OK)

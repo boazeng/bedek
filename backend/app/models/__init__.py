@@ -5,6 +5,7 @@ from .professional import Professional
 from .company_professional import CompanyProfessional
 from .project_item import ProjectItem, ProjectItemKind, SaleUnitType
 from .buyer import Buyer
+from .unit_customer import UnitCustomer
 from .location import Location, LocationCatalog
 from .malfunction import (
     Malfunction,
@@ -27,6 +28,7 @@ __all__ = [
     "ProjectItemKind",
     "SaleUnitType",
     "Buyer",
+    "UnitCustomer",
     "Location",
     "LocationCatalog",
     "Malfunction",

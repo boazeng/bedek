@@ -24,17 +24,23 @@ def is_configured() -> bool:
     return bool(settings.crm_base_url and settings.crm_service_key)
 
 
-def _request(path: str, params: dict, *, timeout: float = 30.0):
+def _request(path: str, params: dict, *, method: str = "GET", body: dict | None = None, timeout: float = 30.0):
     if not is_configured():
         raise CrmError("CRM integration is not configured (missing base URL or service key)")
     qs = urllib.parse.urlencode({k: v for k, v in params.items() if v is not None})
     url = f"{settings.crm_base_url.rstrip('/')}{path}"
     if qs:
         url = f"{url}?{qs}"
-    req = urllib.request.Request(url, headers={"X-Service-Key": settings.crm_service_key})
+    headers = {"X-Service-Key": settings.crm_service_key}
+    data = None
+    if body is not None:
+        data = json.dumps(body).encode("utf-8")
+        headers["Content-Type"] = "application/json"
+    req = urllib.request.Request(url, data=data, headers=headers, method=method)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return json.loads(resp.read().decode("utf-8"))
+            raw = resp.read().decode("utf-8")
+            return json.loads(raw) if raw else None
     except urllib.error.HTTPError as e:
         detail = e.read().decode("utf-8", "replace")[:300]
         raise CrmError(f"CRM returned HTTP {e.code}: {detail}") from e
@@ -64,3 +70,20 @@ def list_realestate_projects(company_id: int, search: str | None = None) -> list
 def list_customers(company_id: int, search: str | None = None) -> list[dict]:
     """The company's customers."""
     return _get("/api/service/customers", company_id, search=search)
+
+
+def create_customer(company_id: int, payload: dict) -> dict:
+    """Create a customer in the CRM tenant. Requires the CRM to expose
+    POST /api/service/customers (service-key, company-scoped)."""
+    return _request("/api/service/customers", {"company_id": company_id}, method="POST", body=payload)
+
+
+def update_customer(company_id: int, membership_id: int, payload: dict) -> dict:
+    """Update a customer in the CRM tenant. Requires the CRM to expose
+    PUT /api/service/customers/{membership_id} (service-key, company-scoped)."""
+    return _request(
+        f"/api/service/customers/{membership_id}",
+        {"company_id": company_id},
+        method="PUT",
+        body=payload,
+    )

@@ -52,9 +52,11 @@ class ProjectItemNode(BaseModel):
     permanent_apt_number: str | None = None
     # Free-text customer label shown next to the row name.
     customer_name: str | None = None
-    # Linked buyer (the unit's customer), if any.
+    # Linked buyer (legacy local link, unused by the CRM-customer flow).
     buyer_id: int | None = None
     buyer_name: str | None = None
+    # CRM customer membership ids linked to this unit (many-to-many).
+    customer_membership_ids: list[int] = []
     # Name of the nearest FLOOR ancestor (None for buildings/entrances/floors).
     floor_name: str | None = None
     children: list["ProjectItemNode"] = []
