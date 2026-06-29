@@ -40,9 +40,9 @@ const LINKS: AdminLink[] = [
   },
   {
     key: 'professionals',
-    label: 'בעלי מקצוע',
+    label: 'סיווגי בעלי מקצוע',
     icon: 'tool',
-    description: 'קטלוג בעלי המקצוע שמטפלים בליקויים (חשמלאי, אינסטלטור, גמרים)',
+    description: 'רשימת הסיווגים לטיפול בליקויים (אלומיניום, אינסטלציה, חשמל, גמרים…)',
   },
   {
     key: 'templates',

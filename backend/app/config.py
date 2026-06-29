@@ -12,7 +12,8 @@ class Settings(BaseSettings):
     app_name: str = "CMM"
     app_env: str = "development"
     # Local dev defaults to SQLite (zero install). For Postgres set:
-    # DATABASE_URL=postgresql+psycopg2://cmm:cmm@localhost:5432/cmm
+    # DATABASE_URL=postgresql+pg8000://cmm:cmm@localhost:5432/cmm
+    # (pg8000 is the pure-Python driver — required for AWS Lambda packaging.)
     database_url: str = "sqlite:///./cmm.db"
     cors_origins: str = "http://localhost:5173"
 
@@ -24,6 +25,10 @@ class Settings(BaseSettings):
     # Allow the /api/auth/dev-login endpoint and listing all users only while
     # this is True. MUST be False in any deployed environment.
     enable_dev_login: bool = True
+
+    # Google OAuth Web client ID (public). Used as the expected `aud` when
+    # verifying Google ID tokens from the browser. Empty = Google login disabled.
+    google_client_id: str = ""
 
     @property
     def cors_origin_list(self) -> list[str]:

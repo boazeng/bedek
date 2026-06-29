@@ -1,0 +1,21 @@
+# SAM deploy config. Secrets (DBPassword, JwtSecret, SeedAdminPassword) are NOT
+# stored here — pass them with --parameter-overrides at deploy time, or use the
+# first-run `sam deploy --guided`. See DEPLOY.md.
+version = 0.1
+
+[default.global.parameters]
+stack_name = "cmm-bedek"
+
+[default.build.parameters]
+# All dependencies are pure-Python (pg8000 + stdlib PBKDF2 + openpyxl), so no
+# container build is needed — a plain `sam build` produces a Lambda-correct
+# package on any OS.
+use_container = false
+cached = true
+
+[default.deploy.parameters]
+region = "us-east-1"
+capabilities = "CAPABILITY_IAM"
+resolve_s3 = true
+confirm_changeset = true
+disable_rollback = false

@@ -6,6 +6,7 @@ import CompanyPicker from './CompanyPicker'
 
 export type NavKey =
   | 'dashboard'
+  | 'open_malfunction'
   | 'companies'          // moved into system_admin
   | 'projects'
   | 'locations'          // moved into admin
@@ -17,6 +18,7 @@ export type NavKey =
   | 'professionals'      // sub-page of system_admin
   | 'templates'          // system-scope templates page (under system_admin)
   | 'company_templates'  // company-scope templates page (under admin)
+  | 'company_professionals' // company-scope trade classifications (under admin)
   | 'system_locations'   // sub-page of system_admin
   | 'system_users'       // sub-page of system_admin — super_admin users
   | 'company_users'      // sub-page of admin — company-scoped users
@@ -30,7 +32,8 @@ type NavItem = {
 }
 
 const MAIN_NAV: NavItem[] = [
-  { key: 'dashboard',  label: 'דאשבורד',     icon: 'dashboard',  roles: ['super_admin', 'company_admin', 'company_user', 'end_customer'] },
+  { key: 'dashboard',  label: 'דף הבית',     icon: 'dashboard',  roles: ['super_admin', 'company_admin', 'company_user', 'end_customer'] },
+  { key: 'open_malfunction', label: 'פתיחת תקלה', icon: 'tool', roles: ['super_admin', 'company_admin', 'company_user'] },
   { key: 'malfunctions', label: 'תקלות',      icon: 'alert',      roles: ['super_admin', 'company_admin', 'company_user'] },
   { key: 'projects',   label: 'פרויקטים',      icon: 'document',   roles: ['super_admin', 'company_admin', 'company_user'] },
   { key: 'admin',      label: 'ניהול חברה',    icon: 'server',     roles: ['super_admin', 'company_admin'] },
@@ -57,6 +60,40 @@ export function visibleMainNav(role: string | undefined): NavItem[] {
 export function visibleBottomNav(role: string | undefined): NavItem[] {
   if (!role) return []
   return BOTTOM_NAV.filter((n) => n.roles.includes(role as NavItem['roles'][number]))
+}
+
+/** Top-bar chip showing the project the user is currently working on. */
+function ActiveProjectBadge() {
+  const { activeProject, setActiveProject } = useAuth()
+  if (!activeProject) return null
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <span style={{ fontSize: '0.78rem', color: 'var(--color-text-light)' }}>
+        פרויקט:
+      </span>
+      <span
+        className="tact-badge tact-badge-on"
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+      >
+        {activeProject.name}
+        <button
+          onClick={() => setActiveProject(null)}
+          title="בטל בחירת פרויקט"
+          style={{
+            border: 'none',
+            background: 'transparent',
+            cursor: 'pointer',
+            color: 'inherit',
+            font: 'inherit',
+            lineHeight: 1,
+            padding: 0,
+          }}
+        >
+          ✕
+        </button>
+      </span>
+    </div>
+  )
 }
 
 const ROLE_LABEL: Record<string, string> = {
@@ -182,7 +219,10 @@ export default function AppShell({ current, onNavigate, children }: Props) {
           <h1 style={{ fontSize: '1.05rem', color: 'var(--color-primary)', fontWeight: 700 }}>
             {[...mainItems, ...bottomItems].find((i) => i.key === current)?.label || ''}
           </h1>
-          <CompanyPicker />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <CompanyPicker />
+            <ActiveProjectBadge />
+          </div>
         </div>
         <div style={{ padding: '24px 28px', flex: 1 }}>{children}</div>
       </main>

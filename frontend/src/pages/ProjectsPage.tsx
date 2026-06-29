@@ -15,7 +15,7 @@ const EMPTY_FORM: FormState = {
 }
 
 export default function ProjectsPage() {
-  const { user } = useAuth()
+  const { user, activeProject, setActiveProject } = useAuth()
   const companyId = useEffectiveCompanyId()
   const confirm = useConfirm()
   const isAdmin = user?.role === 'super_admin' || user?.role === 'company_admin'
@@ -128,10 +128,22 @@ export default function ProjectsPage() {
             { header: 'מנהל פרויקט', key: 'project_manager' },
             { header: 'מנהל עבודה', key: 'site_manager' },
           ]}
-          actions={
-            isAdmin
-              ? (r) => (
-                  <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', whiteSpace: 'nowrap' }}>
+          actions={(r) => {
+            const selected = activeProject?.id === r.id
+            return (
+              <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', whiteSpace: 'nowrap' }}>
+                <button
+                  onClick={() =>
+                    setActiveProject(selected ? null : { id: r.id, name: r.name })
+                  }
+                  className={selected ? 'tact-btn tact-btn-primary' : 'tact-btn tact-btn-ghost'}
+                  style={{ padding: '6px 12px', fontSize: '0.78rem' }}
+                  title={selected ? 'הפרויקט הפעיל — לחץ לביטול הבחירה' : 'בחר פרויקט זה כפרויקט פעיל'}
+                >
+                  {selected ? '✓ נבחר' : 'בחר'}
+                </button>
+                {isAdmin && (
+                  <>
                     <button
                       onClick={() => window.open(`/projects/edit/${r.id}`, '_blank', 'noopener')}
                       className="tact-btn tact-btn-primary"
@@ -146,10 +158,11 @@ export default function ProjectsPage() {
                     <button onClick={() => remove(r)} className="tact-btn tact-btn-ghost" style={{ padding: '6px 12px', fontSize: '0.78rem', color: 'var(--color-accent)' }}>
                       מחק
                     </button>
-                  </div>
-                )
-              : undefined
-          }
+                  </>
+                )}
+              </div>
+            )
+          }}
           empty="עדיין אין פרויקטים."
         />
       )}

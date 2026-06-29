@@ -28,7 +28,7 @@ export default function DashboardPage() {
   if (user?.role === 'super_admin' && !companyId) {
     return (
       <div className="tact-kpi" style={{ textAlign: 'center' }}>
-        <div className="tact-kpi-label">בחר חברה כדי לצפות בדאשבורד</div>
+        <div className="tact-kpi-label">בחר חברה כדי לצפות בדף הבית</div>
         <div style={{ color: 'var(--color-text-light)', fontSize: '0.85rem', marginTop: 8 }}>
           השתמש ברשימה "חברה פעילה" שלמעלה.
         </div>

@@ -243,10 +243,14 @@ def update_item(
 def _kind_for_template(db: Session, t: Template) -> str:
     """Decide which ProjectItemKind a Template instantiates as.
 
-    The template's entity_type carries the kind (building/floor/unit/location).
-    Templates without an entity_type (legacy or under-construction) default to
-    UNIT — a safe wrapper that won't break the project tree.
+    Priority:
+    1. The template's explicit `kind` (set by save-as-template from the source
+       project_item — survives even when the source had no entity_type).
+    2. The kind from the template's entity_type (the picked-from-catalog path).
+    3. UNIT as a safe last-resort default.
     """
+    if t.kind:
+        return t.kind
     if t.entity_type_id is None:
         return ProjectItemKind.UNIT
     et = db.query(EntityType).filter(EntityType.id == t.entity_type_id).first()
@@ -273,17 +277,26 @@ def _instantiate_template_item(
     item: TemplateItem,
     visited: set[int],
 ) -> None:
-    """Append one template item (location or template-ref) into the tree."""
+    """Append one template item (location or template-ref) into the tree.
+
+    Per-instance metadata stored on the TemplateItem (direction, floor, apt
+    numbers) is restored onto the freshly created node so the apply round-trips
+    the original project state."""
     if item.item_kind == TemplateItemKind.LOCATION:
         for _ in range(max(1, item.quantity or 1)):
-            create_item(
+            loc = create_item(
                 db,
                 company_id=company_id,
                 project_id=project_id,
                 parent_id=parent_id,
                 kind=ProjectItemKind.LOCATION,
                 name=item.label or item.location_name or "מיקום",
+                direction=item.direction,
             )
+            loc.floor = item.floor
+            loc.temp_apt_number = item.temp_apt_number
+            loc.permanent_apt_number = item.permanent_apt_number
+            db.flush()
     elif item.item_kind == TemplateItemKind.CHILD_TEMPLATE and item.child_template_id:
         child = (
             db.query(Template)
@@ -300,6 +313,13 @@ def _instantiate_template_item(
                 project_id=project_id,
                 parent_id=parent_id,
                 visited=visited,
+                overrides={
+                    "name": item.label,
+                    "direction": item.direction,
+                    "floor": item.floor,
+                    "temp_apt_number": item.temp_apt_number,
+                    "permanent_apt_number": item.permanent_apt_number,
+                },
             )
 
 
@@ -311,13 +331,17 @@ def apply_template(
     project_id: int,
     parent_id: int | None,
     visited: set[int] | None = None,
+    overrides: dict | None = None,
 ) -> ProjectItem:
     """Expand `template` into ProjectItems under `parent_id`.
 
     Uniform behavior: create one wrapper node whose `kind` comes from the
     template's entity_type (building/floor/unit/location), then put the
-    template's items inside. No format-specific branching — composition via
-    child_template refs handles nested structures (building → floors → apts).
+    template's items inside.
+
+    `overrides` carries per-instance metadata (name, direction, floor, apt
+    numbers) supplied by the parent TemplateItem when this template is used
+    as a CHILD_TEMPLATE. They take precedence over the template defaults.
     """
     visited = visited if visited is not None else set()
     if template.id in visited:
@@ -326,6 +350,7 @@ def apply_template(
             detail=f"Template cycle detected at id {template.id}",
         )
     visited = visited | {template.id}
+    ov = overrides or {}
 
     root_kind = _kind_for_template(db, template)
     root = create_item(
@@ -334,10 +359,15 @@ def apply_template(
         project_id=project_id,
         parent_id=parent_id,
         kind=root_kind,
-        name=template.name,
+        name=ov.get("name") or template.name,
+        direction=ov.get("direction"),
         entity_type_id=template.entity_type_id,
         template_id=template.id,
     )
+    root.floor = ov.get("floor")
+    root.temp_apt_number = ov.get("temp_apt_number")
+    root.permanent_apt_number = ov.get("permanent_apt_number")
+    db.flush()
 
     for ti in _template_items_sorted(db, template.id):
         _instantiate_template_item(

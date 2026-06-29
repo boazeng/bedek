@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Professionals, type ProfessionalRow } from '../lib/api'
+import { CompanyProfessionals, type CompanyProfessionalRow } from '../lib/api'
 import DataTable from '../components/DataTable'
 import Modal, { Field, inputStyle } from '../components/Modal'
-import { useAuth } from '../lib/AuthContext'
-import { useConfirm } from '../components/Dialog'
+import { useAuth, useEffectiveCompanyId } from '../lib/AuthContext'
+import { useAlert, useConfirm } from '../components/Dialog'
 import type { NavKey } from '../components/AppShell'
 
 type Props = { onNavigate: (k: NavKey) => void }
@@ -30,27 +30,39 @@ const arrowBtnStyle = (enabled: boolean): React.CSSProperties => ({
   lineHeight: 1,
 })
 
-export default function ProfessionalsPage({ onNavigate }: Props) {
+export default function CompanyProfessionalsPage({ onNavigate }: Props) {
   const { user } = useAuth()
+  const companyId = useEffectiveCompanyId()
   const confirm = useConfirm()
-  const canWrite = user?.role === 'super_admin'
-  const [rows, setRows] = useState<ProfessionalRow[]>([])
+  const alert = useAlert()
+  const canWrite = user?.role === 'super_admin' || user?.role === 'company_admin'
+  const needsCompany = user?.role === 'super_admin' && !companyId
+  // company_id is only sent when a super_admin is acting on a specific company.
+  const cidParam = user?.role === 'super_admin' ? companyId ?? undefined : undefined
+
+  const [rows, setRows] = useState<CompanyProfessionalRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
-  const [editing, setEditing] = useState<ProfessionalRow | null>(null)
+  const [editing, setEditing] = useState<CompanyProfessionalRow | null>(null)
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [saveErr, setSaveErr] = useState<string | null>(null)
   const [moving, setMoving] = useState(false)
+  const [importing, setImporting] = useState(false)
 
   function load() {
+    if (needsCompany) {
+      setRows([])
+      setLoading(false)
+      return
+    }
     setLoading(true)
-    Professionals.list()
+    CompanyProfessionals.list(cidParam)
       .then(setRows)
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false))
   }
-  useEffect(load, [])
+  useEffect(load, [companyId])
 
   function openCreate() {
     setEditing(null)
@@ -58,7 +70,7 @@ export default function ProfessionalsPage({ onNavigate }: Props) {
     setSaveErr(null)
     setOpen(true)
   }
-  function openEdit(r: ProfessionalRow) {
+  function openEdit(r: CompanyProfessionalRow) {
     setEditing(r)
     setForm({ name: r.name, is_active: r.is_active })
     setSaveErr(null)
@@ -77,8 +89,8 @@ export default function ProfessionalsPage({ onNavigate }: Props) {
       sort_order: editing?.sort_order ?? rows.length,
     }
     try {
-      if (editing) await Professionals.update(editing.id, payload as any)
-      else await Professionals.create(payload as any)
+      if (editing) await CompanyProfessionals.update(editing.id, payload as any)
+      else await CompanyProfessionals.create(payload as any, cidParam)
       setOpen(false)
       load()
     } catch (e) {
@@ -86,7 +98,7 @@ export default function ProfessionalsPage({ onNavigate }: Props) {
     }
   }
 
-  async function remove(r: ProfessionalRow) {
+  async function remove(r: CompanyProfessionalRow) {
     const ok = await confirm({
       title: 'מחיקת סיווג',
       message: `למחוק את הסיווג "${r.name}"? פעולה זו לא ניתנת לביטול.`,
@@ -95,14 +107,14 @@ export default function ProfessionalsPage({ onNavigate }: Props) {
     })
     if (!ok) return
     try {
-      await Professionals.remove(r.id)
+      await CompanyProfessionals.remove(r.id)
       load()
     } catch (e) {
       setError(String(e))
     }
   }
 
-  async function move(r: ProfessionalRow, dir: 'up' | 'down') {
+  async function move(r: CompanyProfessionalRow, dir: 'up' | 'down') {
     if (moving) return
     const idx = rows.findIndex((x) => x.id === r.id)
     const swapIdx = dir === 'up' ? idx - 1 : idx + 1
@@ -111,11 +123,37 @@ export default function ProfessionalsPage({ onNavigate }: Props) {
     ;[newOrder[idx], newOrder[swapIdx]] = [newOrder[swapIdx], newOrder[idx]]
     setMoving(true)
     try {
-      await Professionals.reorder(newOrder.map((x) => x.id))
-      const fresh = await Professionals.list()
+      await CompanyProfessionals.reorder(newOrder.map((x) => x.id), cidParam)
+      const fresh = await CompanyProfessionals.list(cidParam)
       setRows(fresh)
     } finally {
       setMoving(false)
+    }
+  }
+
+  async function resetToDefault() {
+    const ok = await confirm({
+      title: 'שחזור לברירת מחדל',
+      message:
+        'רשימת הסיווגים הקיימת של החברה תימחק לחלוטין ותוחלף ברשימת הסיווגים ' +
+        'של המערכת (חשמל, אינסטלציה, גמרים…). פעולה זו לא ניתנת לביטול. להמשיך?',
+      variant: 'danger',
+      confirmLabel: 'שחזר והחלף',
+    })
+    if (!ok) return
+    setImporting(true)
+    try {
+      const summary = await CompanyProfessionals.importFromSystem(cidParam)
+      await alert({
+        title: 'השחזור הסתיים',
+        message: `נטענו מהמערכת: ${summary.added}\nנמחקו (רשימה קודמת): ${summary.deleted}`,
+        variant: 'success',
+      })
+      load()
+    } catch (e) {
+      setError(String(e))
+    } finally {
+      setImporting(false)
     }
   }
 
@@ -127,18 +165,28 @@ export default function ProfessionalsPage({ onNavigate }: Props) {
             סיווגי בעלי מקצוע
           </h2>
           <div style={{ fontSize: '0.85rem', color: 'var(--color-text-light)' }}>
-            רשימת הסיווגים (אלומיניום, אינסטלציה, חשמל, גמרים…). משותף לכל החברות במערכת.
+            רשימת הסיווגים של החברה (אלומיניום, אינסטלציה, חשמל, גמרים…)
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button
             className="tact-btn tact-btn-ghost"
-            onClick={() => onNavigate('system_admin')}
+            onClick={() => onNavigate('admin')}
             style={{ padding: '8px 16px', fontSize: '0.85rem' }}
           >
-            ← חזרה לניהול מערכת
+            ← חזרה לניהול חברה
           </button>
-          {canWrite && (
+          {canWrite && !needsCompany && (
+            <button
+              onClick={resetToDefault}
+              className="tact-btn tact-btn-ghost"
+              disabled={importing}
+              title="מחק את הרשימה הקיימת והחלף אותה ברשימת הסיווגים של המערכת"
+            >
+              {importing ? 'משחזר…' : '⤓ שחזר לברירת מחדל'}
+            </button>
+          )}
+          {canWrite && !needsCompany && (
             <button onClick={openCreate} className="tact-btn tact-btn-primary">
               + סיווג חדש
             </button>
@@ -146,14 +194,13 @@ export default function ProfessionalsPage({ onNavigate }: Props) {
         </div>
       </div>
 
-      {!canWrite && (
-        <div className="tact-badge tact-badge-soon" style={{ marginBottom: 12 }}>
-          תצוגה בלבד — רק מנהל-על יכול לערוך
-        </div>
-      )}
       {error && <div style={{ color: 'var(--color-accent)', marginBottom: 10 }}>{error}</div>}
 
-      {loading ? (
+      {needsCompany ? (
+        <div className="tact-kpi" style={{ textAlign: 'center' }}>
+          <div className="tact-kpi-label">בחר חברה כדי לנהל את הסיווגים שלה</div>
+        </div>
+      ) : loading ? (
         <div style={{ color: 'var(--color-text-light)' }}>טוען…</div>
       ) : (
         <DataTable

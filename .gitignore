@@ -31,3 +31,12 @@ Thumbs.db
 
 # Build artifacts
 backend/uploads/
+
+# Deploy
+infra/.aws-sam/
+infra/.deploy-params
+infra/out.json
+infra/load-out.json
+
+# Claude Code local config
+.claude/

@@ -219,11 +219,13 @@ def serialize_list(templates: list[Template], db: Session) -> list[TemplateListI
 
     et_ids = [t.entity_type_id for t in templates if t.entity_type_id]
     et_name_by_id: dict[int, str] = {}
+    et_kind_by_id: dict[int, str] = {}
     if et_ids:
-        for et_id, et_name in db.query(EntityType.id, EntityType.name).filter(
-            EntityType.id.in_(et_ids)
-        ).all():
+        for et_id, et_name, et_kind in db.query(
+            EntityType.id, EntityType.name, EntityType.kind
+        ).filter(EntityType.id.in_(et_ids)).all():
             et_name_by_id[et_id] = et_name
+            et_kind_by_id[et_id] = et_kind
 
     company_ids = [t.company_id for t in templates if t.company_id]
     company_name_by_id: dict[int, str] = {}
@@ -242,6 +244,7 @@ def serialize_list(templates: list[Template], db: Session) -> list[TemplateListI
             sort_order=t.sort_order,
             entity_type_id=t.entity_type_id,
             entity_type_name=et_name_by_id.get(t.entity_type_id) if t.entity_type_id else None,
+            entity_type_kind=et_kind_by_id.get(t.entity_type_id) if t.entity_type_id else None,
             company_id=t.company_id,
             company_name=company_name_by_id.get(t.company_id) if t.company_id else None,
             description=t.description,
@@ -383,12 +386,29 @@ def save_subtree_as_template(
         )
 
     def _build(node: ProjectItem, *, is_root: bool) -> Template:
+        # If the source node has no entity_type but has a kind, fall back to
+        # the first active entity_type that matches that kind. Keeps the
+        # "ישות מורכבת" column in the templates list populated.
+        et_id = node.entity_type_id
+        if et_id is None and node.kind:
+            default_et = (
+                db.query(EntityType)
+                .filter(EntityType.kind == node.kind, EntityType.is_active.is_(True))
+                .order_by(EntityType.sort_order, EntityType.id)
+                .first()
+            )
+            if default_et:
+                et_id = default_et.id
+
         tpl = Template(
             name=name.strip() if is_root else f"{name.strip()} / {node.name}",
             code=(code or None) if is_root else None,
             # Format is now driven by entity_type — pick a sensible legacy default.
             format=TemplateFormat.SIMPLE,
-            entity_type_id=node.entity_type_id,
+            entity_type_id=et_id,
+            # Capture the raw kind so apply works even if the source had no
+            # entity_type assigned (common for floors / units created manually).
+            kind=node.kind,
             company_id=company_id,
             is_internal=not is_root,
             description=description if is_root else None,
@@ -407,6 +427,7 @@ def save_subtree_as_template(
         )
         for i, child in enumerate(children):
             if child.kind == ProjectItemKind.LOCATION:
+                # Locations capture name + per-row metadata directly on the item.
                 db.add(
                     TemplateItem(
                         template_id=tpl.id,
@@ -416,11 +437,17 @@ def save_subtree_as_template(
                         quantity=1,
                         sort_order=i,
                         label=None,
-                        floor=None,
+                        floor=child.floor,
+                        direction=child.direction,
+                        temp_apt_number=child.temp_apt_number,
+                        permanent_apt_number=child.permanent_apt_number,
                     )
                 )
             else:
                 # Subtree (building/floor/unit) → recurse, link as child template.
+                # The TemplateItem itself stores the wrapper's per-instance
+                # metadata so apply can restore floor / direction / apt numbers
+                # without polluting the child template definition.
                 sub_tpl = _build(child, is_root=False)
                 db.add(
                     TemplateItem(
@@ -430,8 +457,11 @@ def save_subtree_as_template(
                         child_template_id=sub_tpl.id,
                         quantity=1,
                         sort_order=i,
-                        label=None,
-                        floor=None,
+                        label=child.name,  # name override on apply
+                        floor=child.floor,
+                        direction=child.direction,
+                        temp_apt_number=child.temp_apt_number,
+                        permanent_apt_number=child.permanent_apt_number,
                     )
                 )
         return tpl

@@ -46,6 +46,10 @@ class Template(Base):
     entity_type_id: Mapped[int | None] = mapped_column(
         ForeignKey("entity_types.id", ondelete="SET NULL")
     )
+    # Explicit ProjectItem kind override (building/floor/unit/location). When
+    # set, it wins over the entity_type's kind. Populated by save-as-template
+    # so the wrapper kind survives even when the source had no entity_type set.
+    kind: Mapped[str | None] = mapped_column(String(20))
     # null = system-wide (visible to all companies). Set = scoped to one company.
     company_id: Mapped[int | None] = mapped_column(
         ForeignKey("companies.id", ondelete="CASCADE")
@@ -88,5 +92,9 @@ class TemplateItem(Base):
     quantity: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     label: Mapped[str | None] = mapped_column(String(200))   # optional display override
-    # Only meaningful when the parent Template.format == residential_building.
-    floor: Mapped[str | None] = mapped_column(String(20))
+    # Per-instance metadata captured when a project subtree was saved as a
+    # template. Restored verbatim on apply, regardless of who applies it where.
+    floor: Mapped[str | None] = mapped_column(String(40))
+    direction: Mapped[str | None] = mapped_column(String(20))
+    temp_apt_number: Mapped[str | None] = mapped_column(String(40))
+    permanent_apt_number: Mapped[str | None] = mapped_column(String(40))

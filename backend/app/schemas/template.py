@@ -56,6 +56,9 @@ class TemplateListItem(BaseModel):
     sort_order: int = 0
     entity_type_id: int | None
     entity_type_name: str | None = None
+    # ProjectItem kind that this template instantiates (building/floor/unit/location).
+    # Lets the UI filter the apply-template picker by level (e.g. only buildings).
+    entity_type_kind: str | None = None
     company_id: int | None = None
     company_name: str | None = None
     description: str | None

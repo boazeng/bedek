@@ -284,7 +284,7 @@ export default function ProjectTreeNode({
         data-tree-row={node.id}
         style={{
           display: 'grid',
-          gridTemplateColumns: '110px 75px 190px 110px 230px 90px 90px 120px 40px',
+          gridTemplateColumns: '110px 75px 190px 110px 230px 150px 90px 90px 120px 40px',
           gap: 6,
           alignItems: 'center',
           padding: '6px 10px',
@@ -493,46 +493,38 @@ export default function ProjectTreeNode({
             onKeyDown={cellKeyHandler('name')}
             title="F10 = העתק שם מהשורה הקודמת. ↑/↓ = מעבר בין שורות"
           />
-          {/* Customer label — small muted editable input shown after the
-              row name (replaces the legacy template-source label). */}
-          <input
-            data-col="customer"
-            value={customer}
-            placeholder="· שם לקוח"
-            style={{
-              ...cellInputStyle,
-              fontSize: '0.78rem',
-              color: 'var(--color-text-light)',
-              flexShrink: 0,
-              width: 130,
-              paddingTop: 4,
-              paddingBottom: 4,
-            }}
-            onChange={(e) => setCustomer(e.target.value)}
-            onFocus={(e) => Object.assign(e.currentTarget.style, cellInputFocused)}
-            onBlur={(e) => {
-              Object.assign(e.currentTarget.style, { border: '1px solid transparent', background: 'transparent' })
-              if ((node.customer_name || '') !== customer) {
-                persist({ customer_name: customer || null }).catch(() => {})
-              }
-            }}
-            onKeyDown={(e) => {
-              if (navigateRows(e)) return
-              // Custom F10: copy customer_name from prev sibling.
-              if (e.key === 'F10') {
-                e.preventDefault()
-                const idx = siblings.findIndex((s) => s.id === node.id)
-                if (idx <= 0) return
-                const v = siblings[idx - 1].customer_name || ''
-                setCustomer(v)
-                if ((node.customer_name || '') !== v) {
-                  persist({ customer_name: v || null }).catch(() => {})
-                }
-              }
-            }}
-            title="F10 = העתק מהשורה הקודמת. ↑/↓ = מעבר בין שורות"
-          />
         </div>
+
+        {/* שם לקוח — own column, editable on every row. */}
+        <input
+          data-col="customer"
+          value={customer}
+          placeholder="שם לקוח"
+          style={cellInputStyle}
+          onChange={(e) => setCustomer(e.target.value)}
+          onFocus={(e) => Object.assign(e.currentTarget.style, cellInputFocused)}
+          onBlur={(e) => {
+            Object.assign(e.currentTarget.style, { border: '1px solid transparent', background: 'transparent' })
+            if ((node.customer_name || '') !== customer) {
+              persist({ customer_name: customer || null }).catch(() => {})
+            }
+          }}
+          onKeyDown={(e) => {
+            if (navigateRows(e)) return
+            // Custom F10: copy customer_name from prev sibling.
+            if (e.key === 'F10') {
+              e.preventDefault()
+              const idx = siblings.findIndex((s) => s.id === node.id)
+              if (idx <= 0) return
+              const v = siblings[idx - 1].customer_name || ''
+              setCustomer(v)
+              if ((node.customer_name || '') !== v) {
+                persist({ customer_name: v || null }).catch(() => {})
+              }
+            }
+          }}
+          title="F10 = העתק מהשורה הקודמת. ↑/↓ = מעבר בין שורות"
+        />
 
         {/* מס' דירה זמני — editable on every row. Leave blank when not relevant. */}
         <input

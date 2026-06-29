@@ -1,0 +1,51 @@
+name: Deploy frontend
+
+# Auto-deploys the React SPA to S3 + CloudFront on every push to main that
+# touches the frontend. Auth to AWS is via OIDC (no stored keys) — see the
+# cmm-bedek-github-deploy IAM role. Config comes from repo Variables/Secrets.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/deploy-frontend.yml'
+  workflow_dispatch: {}   # allow manual runs from the Actions tab
+
+permissions:
+  id-token: write   # required for OIDC role assumption
+  contents: read
+
+concurrency:
+  group: deploy-frontend
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install & build
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Publish to S3 + invalidate CloudFront
+        run: |
+          aws s3 sync frontend/dist/ "s3://${{ vars.FRONTEND_BUCKET }}/" --delete
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}" \
+            --paths "/*"

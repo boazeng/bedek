@@ -33,6 +33,12 @@ const LINKS: AdminLink[] = [
     icon: 'layout',
     description: 'קטלוג מיקומים פר חברה (סלון, מטבח, לובי קומתי וכו\')',
   },
+  {
+    key: 'company_professionals',
+    label: 'סיווגי בעלי מקצוע',
+    icon: 'tool',
+    description: 'רשימת הסיווגים של החברה (אלומיניום, אינסטלציה, חשמל, גמרים…)',
+  },
 ]
 
 export default function AdminPage({ onNavigate }: Props) {

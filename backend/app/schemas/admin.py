@@ -157,3 +157,36 @@ class EntityTypeOut(BaseModel):
     kind: str
     sort_order: int
     is_active: bool
+
+
+# ---------- Professionals (system-wide catalog of trade classifications) ----------
+class ProfessionalIn(BaseModel):
+    name: str
+    sort_order: int = 0
+    is_active: bool = True
+
+
+class ProfessionalOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    sort_order: int
+    is_active: bool
+
+
+# ---------- Company professionals (per-company trade classifications) ----------
+class CompanyProfessionalIn(BaseModel):
+    name: str
+    sort_order: int = 0
+    is_active: bool = True
+
+
+class CompanyProfessionalOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    company_id: int
+    name: str
+    sort_order: int
+    is_active: bool

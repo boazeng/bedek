@@ -1,0 +1,428 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  CMM (Construction Malfunction Management) — serverless deployment.
+  FastAPI (Lambda + Mangum) behind an HTTP API, a private RDS PostgreSQL, and a
+  React SPA on S3 served by CloudFront. CloudFront routes /api/* to the API and
+  everything else to S3, so the browser talks to ONE origin (no CORS) and RDS is
+  never exposed to the internet.
+
+Metadata:
+  cfn-lint:
+    config:
+      ignore_checks:
+        # Secrets are passed as NoEcho parameters (encrypted at rest in Lambda
+        # env). Moving them to Secrets Manager is a deliberate Phase-2 hardening
+        # step (needs a VPC endpoint, since the Lambda has no internet route).
+        - W1011
+
+# ---------------------------------------------------------------------------
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC for Lambda + RDS (use the default VPC unless you have another).
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: At least two subnets in different AZs (RDS subnet group needs 2+).
+  DBUsername:
+    Type: String
+    Default: cmmadmin
+    Description: Master username for the RDS PostgreSQL instance.
+  DBPassword:
+    Type: String
+    NoEcho: true
+    MinLength: 12
+    Description: Master password for RDS (>=12 chars, no '/', '@', '"', or spaces).
+  DBName:
+    Type: String
+    Default: cmm
+  DBInstanceClass:
+    Type: String
+    Default: db.t4g.micro
+  DBAllocatedStorage:
+    Type: Number
+    Default: 20
+  JwtSecret:
+    Type: String
+    NoEcho: true
+    MinLength: 32
+    Description: Long random string for signing JWTs.
+  SeedAdminEmail:
+    Type: String
+    Description: Email of the first super_admin (created by the migrate function).
+  SeedAdminPassword:
+    Type: String
+    NoEcho: true
+    MinLength: 10
+    Description: Password for the first super_admin.
+  GoogleClientId:
+    Type: String
+    Default: '30184743393-bp4v0518a1kk3qq9mkl4gsbnbvlv4r3b.apps.googleusercontent.com'
+    Description: Google OAuth Web client ID, used as the expected aud when verifying Google ID tokens. Empty = Google login disabled.
+  DomainName:
+    Type: String
+    Default: ''
+    Description: Custom domain for the app (e.g. cmm.newavera.co.il). Empty = use the cloudfront.net URL.
+  AcmCertificateArn:
+    Type: String
+    Default: ''
+    Description: ACM cert ARN (us-east-1) covering DomainName. Required if DomainName is set.
+  PrivateSubnetACidr:
+    Type: String
+    Default: 172.31.128.0/20
+    Description: Free CIDR in the VPC for the AZ-a private subnet (Lambda egress via NAT).
+  PrivateSubnetBCidr:
+    Type: String
+    Default: 172.31.144.0/20
+    Description: Free CIDR in the VPC for the AZ-b private subnet.
+  NatInstanceAmi:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64
+    Description: Latest Amazon Linux 2023 arm64 AMI for the NAT instance (auto-resolved).
+
+Conditions:
+  HasDomain: !Not [!Equals [!Ref DomainName, '']]
+
+# ---------------------------------------------------------------------------
+Globals:
+  Function:
+    Runtime: python3.13
+    Timeout: 30
+    MemorySize: 512
+    Architectures: [arm64]   # t4g/Graviton-friendly and cheaper
+
+# ---------------------------------------------------------------------------
+Resources:
+
+  # --- Networking: security groups ---------------------------------------
+  LambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: CMM Lambda - egress only (reaches RDS in-VPC).
+      VpcId: !Ref VpcId
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+
+  DbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: CMM RDS - Postgres 5432 from the Lambda SG only.
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref LambdaSecurityGroup
+
+  # --- NAT egress for the Lambda --------------------------------------------
+  # The API Lambda lives in private subnets so it can reach the private RDS.
+  # To let it call Google's OAuth tokeninfo endpoint (and any other external
+  # service), a small NAT instance in an existing public subnet provides
+  # outbound egress. A NAT instance (not a managed NAT Gateway) keeps cost
+  # at ~$3-4/mo; the tradeoff is a single point of failure, acceptable for
+  # this app's traffic profile.
+  PrivateSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VpcId
+      CidrBlock: !Ref PrivateSubnetACidr
+      AvailabilityZone: us-east-1a
+      MapPublicIpOnLaunch: false
+      Tags: [{ Key: Name, Value: cmm-bedek-private-a }]
+
+  PrivateSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VpcId
+      CidrBlock: !Ref PrivateSubnetBCidr
+      AvailabilityZone: us-east-1b
+      MapPublicIpOnLaunch: false
+      Tags: [{ Key: Name, Value: cmm-bedek-private-b }]
+
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VpcId
+      Tags: [{ Key: Name, Value: cmm-bedek-private-rt }]
+
+  PrivateDefaultRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      InstanceId: !Ref NatEgressInstance
+
+  PrivateSubnetARouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnetA
+      RouteTableId: !Ref PrivateRouteTable
+
+  PrivateSubnetBRouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnetB
+      RouteTableId: !Ref PrivateRouteTable
+
+  NatSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: CMM NAT instance - forwards egress from the VPC.
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: -1
+          CidrIp: 172.31.0.0/16   # only in-VPC traffic (the private subnets)
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+
+  NatEgressInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t4g.nano
+      ImageId: !Ref NatInstanceAmi
+      # An existing public subnet (auto-assigns a public IP, routes to the IGW).
+      SubnetId: !Select [0, !Ref SubnetIds]
+      SourceDestCheck: false
+      SecurityGroupIds: [!Ref NatSecurityGroup]
+      Tags: [{ Key: Name, Value: cmm-bedek-nat }]
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+          # AL2023 ships without the iptables CLI, so install it FIRST (the
+          # iptables-nft package provides /usr/sbin/iptables). No `set -e`: a
+          # hiccup in the persistence step must not abort before masquerade.
+          echo 'net.ipv4.ip_forward=1' > /etc/sysctl.d/99-nat.conf
+          sysctl -p /etc/sysctl.d/99-nat.conf
+          dnf install -y iptables-nft iptables-services
+          IFACE=$(ip route show default | awk '{print $5; exit}')
+          iptables -t nat -A POSTROUTING -o "$IFACE" -j MASQUERADE
+          iptables-save > /etc/sysconfig/iptables
+          systemctl enable --now iptables
+
+  # --- Database ----------------------------------------------------------
+  DbSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: CMM RDS subnet group
+      SubnetIds: !Ref SubnetIds
+
+  Database:
+    Type: AWS::RDS::DBInstance
+    # Keep a final snapshot if the stack is ever deleted — never silently lose data.
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      DBInstanceIdentifier: cmm-bedek-db
+      Engine: postgres
+      EngineVersion: '16.10'
+      DBInstanceClass: !Ref DBInstanceClass
+      AllocatedStorage: !Ref DBAllocatedStorage
+      StorageType: gp3
+      StorageEncrypted: true
+      DBName: !Ref DBName
+      MasterUsername: !Ref DBUsername
+      MasterUserPassword: !Ref DBPassword
+      DBSubnetGroupName: !Ref DbSubnetGroup
+      VPCSecurityGroups:
+        - !Ref DbSecurityGroup
+      PubliclyAccessible: false
+      MultiAZ: false            # flip to true for production HA (doubles DB cost)
+      BackupRetentionPeriod: 7
+      DeletionProtection: false # set true once it holds real data
+
+  # --- Backend: FastAPI on Lambda ----------------------------------------
+  ApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: cmm-bedek-api
+      CodeUri: ../backend/
+      Handler: app.lambda_handler.handler
+      VpcConfig:
+        SecurityGroupIds: [!Ref LambdaSecurityGroup]
+        SubnetIds: [!Ref PrivateSubnetA, !Ref PrivateSubnetB]
+      Environment:
+        Variables:
+          APP_ENV: production
+          ENABLE_DEV_LOGIN: 'false'
+          JWT_SECRET: !Ref JwtSecret
+          GOOGLE_CLIENT_ID: !Ref GoogleClientId
+          DATABASE_URL: !Sub
+            - postgresql+pg8000://${DBUsername}:${DBPassword}@${Endpoint}:5432/${DBName}
+            - Endpoint: !GetAtt Database.Endpoint.Address
+          # CORS is unused (same-origin via CloudFront) but kept harmless/explicit.
+          CORS_ORIGINS: '*'
+      Events:
+        Proxy:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /{proxy+}
+            Method: ANY
+        Root:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /
+            Method: ANY
+
+  # --- Migration / bootstrap function (invoked manually post-deploy) -----
+  MigrateFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: cmm-bedek-migrate
+      CodeUri: ../backend/
+      Handler: app.lambda_handler.migrate_handler
+      Timeout: 120
+      VpcConfig:
+        SecurityGroupIds: [!Ref LambdaSecurityGroup]
+        SubnetIds: [!Ref PrivateSubnetA, !Ref PrivateSubnetB]
+      Environment:
+        Variables:
+          APP_ENV: production
+          JWT_SECRET: !Ref JwtSecret
+          DATABASE_URL: !Sub
+            - postgresql+pg8000://${DBUsername}:${DBPassword}@${Endpoint}:5432/${DBName}
+            - Endpoint: !GetAtt Database.Endpoint.Address
+          SEED_ADMIN_EMAIL: !Ref SeedAdminEmail
+          SEED_ADMIN_PASSWORD: !Ref SeedAdminPassword
+
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      # $default stage → no stage prefix in the path, so CloudFront can forward
+      # /api/... straight through and FastAPI sees the same path.
+      StageName: $default
+
+  # --- Frontend: private S3 bucket + CloudFront (OAC) --------------------
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub cmm-bedek-frontend-${AWS::AccountId}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub ${FrontendBucket.Arn}/*
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${Distribution}
+
+  OriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub cmm-bedek-oac-${AWS::AccountId}
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  # SPA deep-link rewrite. Attached ONLY to the S3 default behavior (never to
+  # /api/*), so client-side routes like /projects/edit/4 — which have no real
+  # object in S3 — are served the index.html shell instead of S3's AccessDenied
+  # XML. Any path that looks like a static asset (has a file extension) passes
+  # through untouched. This is the safe alternative to a distribution-wide
+  # CustomErrorResponses, which would also rewrite legitimate API 403/404s.
+  SpaRewriteFunction:
+    Type: AWS::CloudFront::Function
+    Properties:
+      Name: !Sub cmm-bedek-spa-rewrite-${AWS::AccountId}
+      AutoPublish: true
+      FunctionConfig:
+        Comment: Rewrite SPA deep-links to /index.html
+        Runtime: cloudfront-js-2.0
+      FunctionCode: |
+        function handler(event) {
+          var request = event.request;
+          var uri = request.uri;
+          // No file extension in the last path segment → it's a client-side
+          // route, not a static asset. Serve the SPA shell.
+          if (uri.lastIndexOf('.') <= uri.lastIndexOf('/')) {
+            request.uri = '/index.html';
+          }
+          return request;
+        }
+
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        DefaultRootObject: index.html
+        Aliases: !If [HasDomain, [!Ref DomainName], !Ref 'AWS::NoValue']
+        ViewerCertificate: !If
+          - HasDomain
+          - AcmCertificateArn: !Ref AcmCertificateArn
+            SslSupportMethod: sni-only
+            MinimumProtocolVersion: TLSv1.2_2021
+          - !Ref 'AWS::NoValue'
+        # NOTE: no distribution-wide CustomErrorResponses. They would apply to the
+        # /api/* origin too, turning legitimate API 403/404 responses into
+        # index.html (HTTP 200) and breaking the client's error handling.
+        Origins:
+          - Id: s3-frontend
+            DomainName: !GetAtt FrontendBucket.RegionalDomainName
+            OriginAccessControlId: !Ref OriginAccessControl
+            S3OriginConfig:
+              OriginAccessIdentity: ''
+          - Id: api-gateway
+            DomainName: !Sub ${HttpApi}.execute-api.${AWS::Region}.amazonaws.com
+            CustomOriginConfig:
+              OriginProtocolPolicy: https-only
+              OriginSSLProtocols: [TLSv1.2]
+        DefaultCacheBehavior:
+          TargetOriginId: s3-frontend
+          ViewerProtocolPolicy: redirect-to-https
+          # Managed CachePolicy: CachingOptimized
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+          FunctionAssociations:
+            - EventType: viewer-request
+              FunctionARN: !GetAtt SpaRewriteFunction.FunctionMetadata.FunctionARN
+        CacheBehaviors:
+          - PathPattern: /api/*
+            TargetOriginId: api-gateway
+            ViewerProtocolPolicy: https-only
+            AllowedMethods: [GET, HEAD, OPTIONS, PUT, POST, PATCH, DELETE]
+            # Managed CachePolicy: CachingDisabled
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+            # Managed OriginRequestPolicy: AllViewerExceptHostHeader
+            # (forwards Authorization + query, but lets API Gateway keep its own Host)
+            OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
+
+# ---------------------------------------------------------------------------
+Outputs:
+  SiteURL:
+    Description: CloudFront app URL (always works).
+    Value: !Sub https://${Distribution.DomainName}
+  CustomDomainURL:
+    Condition: HasDomain
+    Description: Custom-domain app URL (after the CNAME is added in DNS).
+    Value: !Sub https://${DomainName}
+  ApiEndpoint:
+    Description: Raw HTTP API endpoint (debugging only — use SiteURL normally).
+    Value: !GetAtt HttpApi.ApiEndpoint
+  FrontendBucketName:
+    Description: S3 bucket to sync the built frontend into.
+    Value: !Ref FrontendBucket
+  DistributionId:
+    Description: CloudFront distribution id (for cache invalidation after deploys).
+    Value: !Ref Distribution
+  MigrateFunctionName:
+    Description: Invoke this once after deploy to create tables + super_admin.
+    Value: !Ref MigrateFunction
+  DBEndpoint:
+    Description: RDS endpoint (private).
+    Value: !GetAtt Database.Endpoint.Address

@@ -2,6 +2,8 @@ from .company import Company
 from .user import User, UserRole, UserProjectAccess
 from .project import Project
 from .entity_type import EntityType, EntityKind
+from .professional import Professional
+from .company_professional import CompanyProfessional
 from .system_location import SystemLocation
 from .template import Template, TemplateItem, TemplateItemKind, TemplateFormat
 from .project_item import ProjectItem, ProjectItemKind
@@ -26,6 +28,8 @@ __all__ = [
     "Project",
     "EntityType",
     "EntityKind",
+    "Professional",
+    "CompanyProfessional",
     "SystemLocation",
     "Template",
     "TemplateItem",

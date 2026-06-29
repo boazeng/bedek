@@ -180,10 +180,6 @@ export default function ProjectEditorPage({ projectId }: Props) {
   function openApplyTemplate() {
     setApplyOpen(true)
   }
-  function openAddRoot() {
-    setAddParent(null)
-    setAddOpen(true)
-  }
   function openAddChild(parent: ProjectItemNode) {
     setAddParent(parent)
     setAddOpen(true)
@@ -261,7 +257,7 @@ export default function ProjectEditorPage({ projectId }: Props) {
         </button>
       </div>
 
-      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '28px 24px 60px' }}>
+      <div style={{ maxWidth: 1500, margin: '0 auto', padding: '28px 24px 60px' }}>
         {project && (
           <div style={{ marginBottom: 22 }}>
             <h1 style={{ fontSize: '1.5rem', color: 'var(--color-primary)', fontWeight: 700 }}>
@@ -289,11 +285,8 @@ export default function ProjectEditorPage({ projectId }: Props) {
                 alignItems: 'center',
               }}
             >
-              <button onClick={openAddRoot} className="tact-btn tact-btn-primary">
-                + רכיב ראשי חדש
-              </button>
-              <button onClick={openApplyTemplate} className="tact-btn tact-btn-ghost">
-                <TactIcon name="copy" size={14} /> &nbsp;החל תבנית
+              <button onClick={openApplyTemplate} className="tact-btn tact-btn-primary">
+                + הוספת בנין מתבנית
               </button>
               <span style={{ flex: 1 }} />
               <button
@@ -347,20 +340,24 @@ export default function ProjectEditorPage({ projectId }: Props) {
               <div style={{ color: 'var(--color-accent)', marginBottom: 10 }}>{error}</div>
             )}
 
-            {/* Tree table */}
+            {/* Tree table — wraps the grid so the user can scroll horizontally
+                when the column widths exceed the viewport. The inner wrapper
+                holds its natural width so columns don't collapse. */}
             <div
               style={{
                 background: 'var(--color-bg-white)',
                 border: '1px solid var(--color-border)',
                 borderRadius: 14,
-                overflow: 'hidden',
+                overflowX: 'auto',
+                overflowY: 'hidden',
               }}
             >
+            <div style={{ minWidth: 'fit-content' }}>
               {/* Header */}
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: '110px 75px 190px 110px 230px 90px 90px 120px 40px',
+                  gridTemplateColumns: '110px 75px 190px 110px 230px 150px 90px 90px 120px 40px',
                   gap: 6,
                   padding: '10px 14px',
                   background: 'var(--color-primary-soft)',
@@ -376,6 +373,7 @@ export default function ProjectEditorPage({ projectId }: Props) {
                 <span>סוג</span>
                 <span>קומה</span>
                 <span>שם</span>
+                <span>שם לקוח</span>
                 <span style={{ textAlign: 'center' }}>מס׳ דירה זמני</span>
                 <span style={{ textAlign: 'center' }}>מס׳ דירה קבוע</span>
                 <span>כיוון</span>
@@ -385,7 +383,7 @@ export default function ProjectEditorPage({ projectId }: Props) {
               {visibleTree.length === 0 ? (
                 <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--color-text-light)' }}>
                   {tree.length === 0
-                    ? 'הפרויקט ריק. החל תבנית או הוסף רכיב ראשי כדי להתחיל.'
+                    ? 'הפרויקט ריק. לחץ "+ הוספת בנין מתבנית" כדי להתחיל.'
                     : apartmentsOnly
                       ? 'אין דירות בפרויקט. כבי את מסנן "דירות" כדי לראות את העץ המלא.'
                       : 'אין רכיבים להצגה.'}
@@ -407,6 +405,7 @@ export default function ProjectEditorPage({ projectId }: Props) {
                   />
                 ))
               )}
+            </div>
             </div>
           </>
         )}
@@ -568,20 +567,40 @@ function ApplyTemplateDialog({
   onApplied: () => void
   onError: (msg: string) => void
 }) {
-  const [templates, setTemplates] = useState<TemplateListRow[]>([])
+  // Two scoped lists. The user picks one of the tabs, then a template inside.
+  const [companyTemplates, setCompanyTemplates] = useState<TemplateListRow[]>([])
+  const [systemTemplates, setSystemTemplates] = useState<TemplateListRow[]>([])
+  const [tab, setTab] = useState<'company' | 'system'>('company')
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [applying, setApplying] = useState(false)
 
   useEffect(() => {
     if (!open) return
-    Templates.list({ companyId })
-      .then((tpls) => {
-        const active = tpls.filter((t) => t.is_active)
-        setTemplates(active)
-        setSelectedId(active[0]?.id ?? null)
+    setSelectedId(null)
+    const buildings = (rows: TemplateListRow[]) =>
+      rows.filter((t) => t.is_active && t.entity_type_kind === 'building')
+    Promise.all([
+      // 'company' scope filtered server-side to company_id (super needs it).
+      Templates.list({ scope: 'company', companyId }).then(buildings),
+      Templates.list({ scope: 'system' }).then(buildings),
+    ])
+      .then(([co, sys]) => {
+        setCompanyTemplates(co)
+        setSystemTemplates(sys)
+        // Default to the tab that actually has something.
+        const startTab = co.length > 0 ? 'company' : 'system'
+        setTab(startTab)
+        const first = (startTab === 'company' ? co : sys)[0]
+        setSelectedId(first?.id ?? null)
       })
       .catch((e) => onError(String(e)))
   }, [open])
+
+  function switchTab(next: 'company' | 'system') {
+    setTab(next)
+    const first = (next === 'company' ? companyTemplates : systemTemplates)[0]
+    setSelectedId(first?.id ?? null)
+  }
 
   async function apply() {
     if (!selectedId) return
@@ -596,38 +615,146 @@ function ApplyTemplateDialog({
     }
   }
 
+  const rows = tab === 'company' ? companyTemplates : systemTemplates
+
+  const tabStyle = (active: boolean): React.CSSProperties => ({
+    flex: 1,
+    padding: '10px 14px',
+    border: '1px solid var(--color-border)',
+    borderRadius: 8,
+    background: active ? 'var(--color-primary)' : 'transparent',
+    color: active ? 'var(--color-text-white)' : 'var(--color-text)',
+    fontWeight: active ? 600 : 500,
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+    fontSize: '0.9rem',
+    transition: 'background .15s, color .15s',
+  })
+
   return (
     <Modal
       open={open}
-      title="החל תבנית על הפרויקט"
+      title="הוספת בנין מתבנית"
       onClose={onClose}
-      width={560}
+      width={580}
       footer={
         <>
           <button className="tact-btn tact-btn-ghost" onClick={onClose}>
             ביטול
           </button>
           <button className="tact-btn tact-btn-primary" onClick={apply} disabled={!selectedId || applying}>
-            {applying ? 'מחיל…' : 'החל'}
+            {applying ? 'מוסיף…' : 'הוסף בנין'}
           </button>
         </>
       }
     >
-      <Field label="בחר תבנית">
-        <select
-          style={inputStyle}
-          value={selectedId ?? ''}
-          onChange={(e) => setSelectedId(e.target.value ? Number(e.target.value) : null)}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+        <button onClick={() => switchTab('company')} style={tabStyle(tab === 'company')}>
+          תבניות בנין חברה ({companyTemplates.length})
+        </button>
+        <button onClick={() => switchTab('system')} style={tabStyle(tab === 'system')}>
+          תבניות בנין מערכת ({systemTemplates.length})
+        </button>
+      </div>
+
+      <div style={{ fontSize: '0.82rem', color: 'var(--color-text-light)', marginBottom: 8 }}>
+        {tab === 'company'
+          ? 'תבניות שמורות של החברה (יצירה דרך כוכבית ★ בעץ הפרויקט).'
+          : 'תבניות מערכת משותפות לכל החברות.'}
+      </div>
+
+      {rows.length === 0 ? (
+        <div
+          style={{
+            border: '1px dashed var(--color-border)',
+            borderRadius: 10,
+            padding: '24px 14px',
+            textAlign: 'center',
+            color: 'var(--color-text-light)',
+            fontSize: '0.88rem',
+          }}
         >
-          {templates.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name}
-              {t.entity_type_name ? ` · ${t.entity_type_name}` : ''}
-            </option>
-          ))}
-        </select>
-      </Field>
-      <div style={{ fontSize: '0.82rem', color: 'var(--color-text-light)' }}>
+          אין תבניות בנין {tab === 'company' ? 'בחברה זו' : 'במערכת'}
+        </div>
+      ) : (
+        <div
+          style={{
+            border: '1px solid var(--color-border)',
+            borderRadius: 10,
+            maxHeight: 320,
+            overflowY: 'auto',
+            background: 'var(--color-bg-white)',
+          }}
+        >
+          {rows.map((t, i) => {
+            const active = t.id === selectedId
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setSelectedId(t.id)}
+                onDoubleClick={apply}
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  textAlign: 'start',
+                  padding: '10px 14px',
+                  border: 'none',
+                  borderBottom:
+                    i < rows.length - 1 ? '1px solid var(--color-border)' : 'none',
+                  background: active ? 'var(--color-primary-soft)' : 'transparent',
+                  color: 'var(--color-text)',
+                  font: 'inherit',
+                  cursor: 'pointer',
+                  transition: 'background .12s',
+                }}
+                onMouseEnter={(e) => {
+                  if (!active) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(31,58,95,0.05)'
+                }}
+                onMouseLeave={(e) => {
+                  if (!active) (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span
+                    style={{
+                      width: 14,
+                      height: 14,
+                      borderRadius: '50%',
+                      border: '2px solid ' + (active ? 'var(--color-primary)' : 'var(--color-border)'),
+                      background: active ? 'var(--color-primary)' : 'transparent',
+                      flexShrink: 0,
+                    }}
+                  />
+                  <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>{t.name}</span>
+                  {t.entity_type_name && (
+                    <span
+                      className="tact-badge tact-badge-on"
+                      style={{ fontSize: '0.72rem', padding: '2px 8px' }}
+                    >
+                      {t.entity_type_name}
+                    </span>
+                  )}
+                </div>
+                {t.description && t.description !== t.name && (
+                  <div
+                    style={{
+                      fontSize: '0.78rem',
+                      color: 'var(--color-text-light)',
+                      marginTop: 4,
+                      marginInlineStart: 22,
+                    }}
+                  >
+                    {t.description}
+                  </div>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      )}
+
+      <div style={{ fontSize: '0.82rem', color: 'var(--color-text-light)', marginTop: 10 }}>
         התבנית תורחב לעץ של רכיבים (בניין → קומות → יחידות → מיקומים). פריטים קיימים בפרויקט יישארו ללא שינוי.
       </div>
     </Modal>

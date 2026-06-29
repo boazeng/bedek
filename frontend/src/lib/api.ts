@@ -1,5 +1,6 @@
 const TOKEN_KEY = 'cmm-token'
 const COMPANY_KEY = 'cmm-active-company-id'
+const PROJECT_KEY = 'cmm-active-project'
 
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY)
@@ -10,6 +11,7 @@ export function setToken(t: string) {
 export function clearToken() {
   localStorage.removeItem(TOKEN_KEY)
   localStorage.removeItem(COMPANY_KEY)
+  localStorage.removeItem(PROJECT_KEY)
 }
 
 /** For super_admin: which tenant to view. Ignored for other roles. */
@@ -20,6 +22,24 @@ export function getActiveCompanyId(): number | null {
 export function setActiveCompanyId(id: number | null) {
   if (id === null) localStorage.removeItem(COMPANY_KEY)
   else localStorage.setItem(COMPANY_KEY, String(id))
+}
+
+/** The project the user is currently working on. Persisted (id + name) so the
+ *  top-bar badge can show the name without re-fetching. Null = none selected. */
+export type ActiveProject = { id: number; name: string }
+export function getActiveProject(): ActiveProject | null {
+  const v = localStorage.getItem(PROJECT_KEY)
+  if (!v) return null
+  try {
+    const p = JSON.parse(v)
+    return typeof p?.id === 'number' ? { id: p.id, name: String(p.name ?? '') } : null
+  } catch {
+    return null
+  }
+}
+export function setActiveProject(p: ActiveProject | null) {
+  if (p === null) localStorage.removeItem(PROJECT_KEY)
+  else localStorage.setItem(PROJECT_KEY, JSON.stringify(p))
 }
 
 type ApiOptions = {
@@ -141,6 +161,23 @@ export type EntityTypeRow = {
   is_active: boolean
 }
 
+/** A professional trade classification (אלומיניום, אינסטלציה, …). */
+export type ProfessionalRow = {
+  id: number
+  name: string
+  sort_order: number
+  is_active: boolean
+}
+
+/** Per-company professional trade classification. */
+export type CompanyProfessionalRow = {
+  id: number
+  company_id: number
+  name: string
+  sort_order: number
+  is_active: boolean
+}
+
 export type TemplateItemKind = 'location' | 'template'
 /** Legacy — kept for backward-compat with stored values. Behavior now driven
  *  by the entity_type's kind. New templates send 'simple' and ignore the
@@ -168,6 +205,8 @@ export type TemplateListRow = {
   sort_order: number
   entity_type_id: number | null
   entity_type_name: string | null
+  /** ProjectItem kind this template instantiates as (building/floor/unit/location). */
+  entity_type_kind: EntityKind | null
   /** null = system-wide template. Set = scoped to that company. */
   company_id: number | null
   company_name: string | null
@@ -377,6 +416,23 @@ export const Auth = {
       body: { email },
       auth: false,
     }),
+  login: (email: string, password: string) =>
+    api<{ access_token: string; user: CurrentUser }>('/api/auth/login', {
+      method: 'POST',
+      body: { email, password },
+      auth: false,
+    }),
+  google: (credential: string) =>
+    api<{ access_token: string; user: CurrentUser }>('/api/auth/google', {
+      method: 'POST',
+      body: { credential },
+      auth: false,
+    }),
+  changePassword: (current_password: string, new_password: string) =>
+    api<{ ok: boolean }>('/api/auth/change-password', {
+      method: 'POST',
+      body: { current_password, new_password },
+    }),
   me: () => api<CurrentUser>('/api/auth/me'),
 }
 
@@ -516,6 +572,51 @@ export const EntityTypes = {
     api<void>('/api/system/entity-types/reorder', {
       method: 'POST',
       body: { ids },
+    }),
+}
+
+export const Professionals = {
+  list: () => api<ProfessionalRow[]>('/api/system/professionals'),
+  create: (body: Partial<ProfessionalRow>) =>
+    api<ProfessionalRow>('/api/system/professionals', { method: 'POST', body }),
+  update: (id: number, body: Partial<ProfessionalRow>) =>
+    api<ProfessionalRow>(`/api/system/professionals/${id}`, { method: 'PUT', body }),
+  remove: (id: number) =>
+    api<void>(`/api/system/professionals/${id}`, { method: 'DELETE' }),
+  reorder: (ids: number[]) =>
+    api<void>('/api/system/professionals/reorder', {
+      method: 'POST',
+      body: { ids },
+    }),
+}
+
+export const CompanyProfessionals = {
+  list: (companyId?: number) =>
+    api<CompanyProfessionalRow[]>('/api/professionals', {
+      query: { company_id: companyId },
+    }),
+  create: (body: Partial<CompanyProfessionalRow>, companyId?: number) =>
+    api<CompanyProfessionalRow>('/api/professionals', {
+      method: 'POST',
+      body,
+      query: { company_id: companyId },
+    }),
+  update: (id: number, body: Partial<CompanyProfessionalRow>) =>
+    api<CompanyProfessionalRow>(`/api/professionals/${id}`, { method: 'PUT', body }),
+  remove: (id: number) =>
+    api<void>(`/api/professionals/${id}`, { method: 'DELETE' }),
+  reorder: (ids: number[], companyId?: number) =>
+    api<void>('/api/professionals/reorder', {
+      method: 'POST',
+      body: { ids },
+      query: { company_id: companyId },
+    }),
+  /** Reset the company catalog to the system-wide default classifications.
+   *  Full-replacement: existing rows are deleted first. */
+  importFromSystem: (companyId?: number) =>
+    api<{ added: number; deleted: number }>('/api/professionals/import-system', {
+      method: 'POST',
+      query: { company_id: companyId },
     }),
 }
 

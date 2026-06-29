@@ -23,6 +23,7 @@ from .models import (
     MalfunctionStatus,
     MalfunctionSource,
     MalfunctionGroup,
+    Professional,
     SystemLocation,
     User,
     UserRole,
@@ -64,6 +65,29 @@ def _ensure_entity_types(db) -> None:
                 is_active=True,
             )
         )
+        next_order += 1
+    db.commit()
+
+
+DEFAULT_PROFESSIONALS = [
+    "חשמל",
+    "אינסטלציה",
+    "גמרים",
+    "שלד",
+    "מיגון",
+    "איטום",
+    "אלומיניום",
+]
+
+
+def _ensure_professionals(db) -> None:
+    """Idempotent: insert any missing default professional classifications."""
+    existing_names = {row.name for row in db.query(Professional).all()}
+    next_order = db.query(Professional).count()
+    for name in DEFAULT_PROFESSIONALS:
+        if name in existing_names:
+            continue
+        db.add(Professional(name=name, sort_order=next_order, is_active=True))
         next_order += 1
     db.commit()
 
@@ -297,6 +321,7 @@ def seed():
     try:
         # System-wide tables are always kept in sync (idempotent).
         _ensure_entity_types(db)
+        _ensure_professionals(db)
         _ensure_system_locations(db)
 
         if db.query(User).filter(User.role == UserRole.SUPER_ADMIN).first():

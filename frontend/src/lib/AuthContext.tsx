@@ -13,6 +13,9 @@ import {
   setToken,
   getActiveCompanyId,
   setActiveCompanyId,
+  getActiveProject,
+  setActiveProject as persistActiveProject,
+  type ActiveProject,
   type CurrentUser,
 } from './api'
 
@@ -21,9 +24,14 @@ type AuthState = {
   loading: boolean
   /** For super_admin: the company they're currently inspecting. Null for non-super. */
   activeCompanyId: number | null
+  /** The project the user is currently working on (global selection). */
+  activeProject: ActiveProject | null
   loginAs: (email: string) => Promise<void>
+  loginWithPassword: (email: string, password: string) => Promise<void>
+  loginWithGoogle: (credential: string) => Promise<void>
   logout: () => void
   setActiveCompany: (id: number | null) => void
+  setActiveProject: (p: ActiveProject | null) => void
   refresh: () => Promise<void>
 }
 
@@ -34,6 +42,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [activeCompanyId, setActiveCompanyIdState] = useState<number | null>(
     getActiveCompanyId(),
+  )
+  const [activeProject, setActiveProjectState] = useState<ActiveProject | null>(
+    getActiveProject(),
   )
 
   const refresh = useCallback(async () => {
@@ -52,10 +63,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refresh()
   }, [refresh])
 
-  const loginAs = useCallback(async (email: string) => {
-    const { access_token, user: me } = await Auth.devLogin(email)
+  function applyLogin(me: CurrentUser, access_token: string) {
     setToken(access_token)
     setUser(me)
+    // Fresh session — drop any project carried over from a previous login.
+    persistActiveProject(null)
+    setActiveProjectState(null)
     // For non-super_admin set their own company as active; super_admin must pick.
     if (me.role !== 'super_admin' && me.company_id) {
       setActiveCompanyId(me.company_id)
@@ -64,17 +77,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setActiveCompanyId(null)
       setActiveCompanyIdState(null)
     }
+  }
+
+  const loginAs = useCallback(async (email: string) => {
+    const { access_token, user: me } = await Auth.devLogin(email)
+    applyLogin(me, access_token)
+  }, [])
+
+  const loginWithPassword = useCallback(
+    async (email: string, password: string) => {
+      const { access_token, user: me } = await Auth.login(email, password)
+      applyLogin(me, access_token)
+    },
+    [],
+  )
+
+  const loginWithGoogle = useCallback(async (credential: string) => {
+    const { access_token, user: me } = await Auth.google(credential)
+    applyLogin(me, access_token)
   }, [])
 
   const logout = useCallback(() => {
     clearToken()
     setUser(null)
     setActiveCompanyIdState(null)
+    setActiveProjectState(null)
+  }, [])
+
+  const setActiveProject = useCallback((p: ActiveProject | null) => {
+    persistActiveProject(p)
+    setActiveProjectState(p)
   }, [])
 
   const setActiveCompany = useCallback((id: number | null) => {
     setActiveCompanyId(id)
     setActiveCompanyIdState(id)
+    // A project belongs to one company — switching tenant invalidates it.
+    persistActiveProject(null)
+    setActiveProjectState(null)
   }, [])
 
   const value = useMemo<AuthState>(
@@ -82,12 +122,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       loading,
       activeCompanyId,
+      activeProject,
       loginAs,
+      loginWithPassword,
+      loginWithGoogle,
       logout,
       setActiveCompany,
+      setActiveProject,
       refresh,
     }),
-    [user, loading, activeCompanyId, loginAs, logout, setActiveCompany, refresh],
+    [user, loading, activeCompanyId, activeProject, loginAs, loginWithPassword, loginWithGoogle, logout, setActiveCompany, setActiveProject, refresh],
   )
 
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>

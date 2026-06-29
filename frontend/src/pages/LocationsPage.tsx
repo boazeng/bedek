@@ -4,6 +4,9 @@ import DataTable from '../components/DataTable'
 import Modal, { Field, inputStyle } from '../components/Modal'
 import { useAuth, useEffectiveCompanyId } from '../lib/AuthContext'
 import { useAlert, useConfirm } from '../components/Dialog'
+import type { NavKey } from '../components/AppShell'
+
+type Props = { onNavigate: (k: NavKey) => void }
 
 type FormState = Pick<LocationRow, 'name' | 'applies_to_public_only' | 'sort_order'>
 
@@ -31,7 +34,7 @@ const arrowBtnStyle = (enabled: boolean): React.CSSProperties => ({
   lineHeight: 1,
 })
 
-export default function LocationsPage() {
+export default function LocationsPage({ onNavigate }: Props) {
   const { user } = useAuth()
   const companyId = useEffectiveCompanyId()
   const confirm = useConfirm()
@@ -182,6 +185,13 @@ export default function LocationsPage() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            className="tact-btn tact-btn-ghost"
+            onClick={() => onNavigate('admin')}
+            style={{ padding: '8px 16px', fontSize: '0.85rem' }}
+          >
+            ← חזרה לניהול חברה
+          </button>
           <button
             onClick={importFromSystem}
             className="tact-btn tact-btn-ghost"

@@ -13,10 +13,12 @@ import AdminPage from './pages/AdminPage'
 import SystemAdminPage from './pages/SystemAdminPage'
 import EntitiesPage from './pages/EntitiesPage'
 import ProfessionalsPage from './pages/ProfessionalsPage'
+import CompanyProfessionalsPage from './pages/CompanyProfessionalsPage'
 import TemplatesPage from './pages/TemplatesPage'
 import TemplateEditorPage from './pages/TemplateEditorPage'
 import ProjectEditorPage from './pages/ProjectEditorPage'
 import MalfunctionsPage from './pages/MalfunctionsPage'
+import OpenMalfunctionPage from './pages/OpenMalfunctionPage'
 import UnitDefectsPage from './pages/UnitDefectsPage'
 import SystemLocationsPage from './pages/SystemLocationsPage'
 
@@ -31,7 +33,7 @@ const SYSTEM_ADMIN_SUBPAGES: NavKey[] = [
   'system_locations',
 ]
 // Sub-pages of the company admin (ניהול חברה).
-const ADMIN_SUBPAGES: NavKey[] = ['company_users', 'company_templates', 'locations']
+const ADMIN_SUBPAGES: NavKey[] = ['company_users', 'company_templates', 'locations', 'company_professionals']
 const MALFUNCTION_SUBPAGES: NavKey[] = ['unit_defects']
 
 /** Parses the URL for stand-alone editor routes that open in their own tab. */
@@ -76,18 +78,20 @@ function ProtectedShell() {
   return (
     <AppShell current={safe} onNavigate={setCurrent}>
       {safe === 'dashboard' && <DashboardPage />}
+      {safe === 'open_malfunction' && <OpenMalfunctionPage />}
       {safe === 'companies' && <CompaniesPage />}
       {safe === 'system_users' && <UsersPage scope="system" />}
       {safe === 'company_users' && <UsersPage scope="company" />}
       {safe === 'projects' && <ProjectsPage />}
       {safe === 'sale_units' && <SaleUnitsPage />}
-      {safe === 'locations' && <LocationsPage />}
+      {safe === 'locations' && <LocationsPage onNavigate={setCurrent} />}
       {safe === 'admin' && <AdminPage onNavigate={setCurrent} />}
       {safe === 'system_admin' && <SystemAdminPage onNavigate={setCurrent} />}
       {safe === 'entities' && <EntitiesPage onNavigate={setCurrent} />}
       {safe === 'professionals' && <ProfessionalsPage onNavigate={setCurrent} />}
       {safe === 'templates' && <TemplatesPage onNavigate={setCurrent} scope="system" />}
       {safe === 'company_templates' && <TemplatesPage onNavigate={setCurrent} scope="company" />}
+      {safe === 'company_professionals' && <CompanyProfessionalsPage onNavigate={setCurrent} />}
       {safe === 'system_locations' && <SystemLocationsPage onNavigate={setCurrent} />}
       {safe === 'malfunctions' && (
         <MalfunctionsPage

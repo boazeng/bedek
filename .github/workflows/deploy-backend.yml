@@ -1,0 +1,67 @@
+name: Deploy backend
+
+# Auto-deploys the FastAPI Lambda + infra (SAM stack cmm-bedek) on every push to
+# main that touches the backend or infra. Auth to AWS is via OIDC. Secrets/config
+# come from repo Variables/Secrets. The runner is a clean environment, so
+# `sam build` always does a full dependency resolve (avoids the incremental-cache
+# bug that once shipped a Lambda missing mangum).
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'infra/**'
+      - '.github/workflows/deploy-backend.yml'
+  workflow_dispatch: {}   # allow manual runs from the Actions tab
+
+permissions:
+  id-token: write   # required for OIDC role assumption
+  contents: read
+
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - uses: aws-actions/setup-sam@v2
+        with:
+          use-installer: true
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: SAM build & deploy
+        working-directory: infra
+        run: |
+          sam build
+          sam deploy \
+            --stack-name cmm-bedek \
+            --region "${{ vars.AWS_REGION }}" \
+            --capabilities CAPABILITY_IAM \
+            --resolve-s3 \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset \
+            --no-progressbar \
+            --parameter-overrides \
+              VpcId=${{ vars.VPC_ID }} \
+              SubnetIds=${{ vars.SUBNET_IDS }} \
+              DBUsername=${{ vars.DB_USERNAME }} \
+              DBPassword='${{ secrets.DB_PASSWORD }}' \
+              JwtSecret='${{ secrets.JWT_SECRET }}' \
+              SeedAdminEmail='${{ secrets.SEED_ADMIN_EMAIL }}' \
+              SeedAdminPassword='${{ secrets.SEED_ADMIN_PASSWORD }}' \
+              GoogleClientId=${{ vars.GOOGLE_CLIENT_ID }} \
+              DomainName=${{ vars.DOMAIN_NAME }} \
+              AcmCertificateArn=${{ vars.ACM_CERTIFICATE_ARN }}
