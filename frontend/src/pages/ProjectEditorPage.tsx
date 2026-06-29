@@ -87,6 +87,39 @@ export default function ProjectEditorPage({ projectId }: Props) {
     }
   }
 
+  // Re-sequence the regular floors (קומה 1, 2, 3…) in each entrance, in order.
+  // Basements (מרתף) and the ground floor (קרקע) are left untouched.
+  async function renumberFloors() {
+    setBusy(true)
+    try {
+      let renamed = 0
+      for (const building of tree) {
+        for (const entrance of building.children) {
+          let n = 0
+          for (const floor of entrance.children) {
+            if (floor.name.includes('מרתף') || floor.name.includes('קרקע')) continue
+            n += 1
+            const desired = `קומה ${n}`
+            if (floor.name !== desired) {
+              await ProjectTree.update(projectId, floor.id, { name: desired })
+              renamed += 1
+            }
+          }
+        }
+      }
+      await alert({
+        title: 'מספור קומות מחדש',
+        message: `מוספרו מחדש ${renamed} קומות (ללא מרתף וקומת קרקע).`,
+        variant: 'success',
+      })
+      refresh()
+    } catch (e) {
+      setError(String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   if (authLoading) {
     return (
       <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>
@@ -155,6 +188,9 @@ export default function ProjectEditorPage({ projectId }: Props) {
             </button>
             <button className="tact-btn tact-btn-ghost" onClick={renumber} disabled={busy || tree.length === 0}>
               מספור דירות מחדש
+            </button>
+            <button className="tact-btn tact-btn-ghost" onClick={renumberFloors} disabled={busy || tree.length === 0}>
+              מספור קומות מחדש
             </button>
             <span style={{ flex: 1 }} />
             <button
