@@ -89,8 +89,8 @@ export default function EntranceNode({ projectId, entrance, onRefresh, onConfirm
             אין קומות עדיין — לחץ "+ קומה".
           </div>
         ) : (
-          // Display bottom-up: ground floor sits at the bottom, upper floors stack above.
-          [...floors].reverse().map((f) => (
+          // Display top-down right under the entrance: מרתף → קומת קרקע → קומה 1 → קומה 2 …
+          floors.map((f) => (
             <FloorNode
               key={f.id}
               projectId={projectId}
