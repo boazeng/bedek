@@ -35,6 +35,12 @@ const LINKS: AdminLink[] = [
     icon: 'tool',
     description: 'רשימת הסיווגים לטיפול בליקויים (אלומיניום, אינסטלציה, חשמל, גמרים…)',
   },
+  {
+    key: 'system_locations',
+    label: 'מיקומים (מערכת)',
+    icon: 'layout',
+    description: 'רשימת מיקומי הליקויים (סלון, מטבח, לובי קומתי…) — חברה מייבאת ממנה את הרשימה שלה',
+  },
 ]
 
 export default function SystemAdminPage({ onNavigate }: Props) {

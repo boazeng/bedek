@@ -7,12 +7,19 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..deps import get_current_user, get_db, require_company_admin
-from ..models import Company, LocationCatalog, User, UserRole
+from ..models import Company, LocationCatalog, SystemLocation, User, UserRole
 from ..schemas.admin import LocationIn, LocationOut
 
 
 class ReorderRequest(BaseModel):
     ids: list[int]
+
+
+class ImportFromSystemSummary(BaseModel):
+    """Returned by POST /api/locations/import-system — full-replacement import."""
+
+    added: int = 0
+    deleted: int = 0
 
 
 router = APIRouter(prefix="/api/locations", tags=["locations"])
@@ -68,6 +75,39 @@ def create_location(
     db.commit()
     db.refresh(loc)
     return loc
+
+
+@router.post("/import-system", response_model=ImportFromSystemSummary)
+def import_from_system(
+    company_id: int | None = Query(default=None),
+    db: Session = Depends(get_db),
+    actor: User = Depends(require_company_admin),
+):
+    """Reset the company's location catalog to the system-wide default list.
+    Full-replacement: existing rows are deleted, then every active system
+    location is inserted in its current order."""
+    cid = _resolve_company(actor, company_id, db)
+    summary = ImportFromSystemSummary()
+
+    summary.deleted = (
+        db.query(LocationCatalog).filter(LocationCatalog.company_id == cid).count()
+    )
+    db.query(LocationCatalog).filter(LocationCatalog.company_id == cid).delete(
+        synchronize_session=False
+    )
+    db.flush()
+
+    sys_rows = (
+        db.query(SystemLocation)
+        .filter(SystemLocation.is_active.is_(True))
+        .order_by(SystemLocation.sort_order, SystemLocation.id)
+        .all()
+    )
+    for i, r in enumerate(sys_rows):
+        db.add(LocationCatalog(company_id=cid, name=r.name, sort_order=i))
+        summary.added += 1
+    db.commit()
+    return summary
 
 
 @router.post("/reorder", status_code=status.HTTP_204_NO_CONTENT)

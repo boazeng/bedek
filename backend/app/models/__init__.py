@@ -7,6 +7,7 @@ from .project_item import ProjectItem, ProjectItemKind, SaleUnitType
 from .buyer import Buyer
 from .unit_customer import UnitCustomer
 from .location import Location, LocationCatalog
+from .system_location import SystemLocation
 from .malfunction import (
     Malfunction,
     MalfunctionActivity,
@@ -31,6 +32,7 @@ __all__ = [
     "UnitCustomer",
     "Location",
     "LocationCatalog",
+    "SystemLocation",
     "Malfunction",
     "MalfunctionActivity",
     "MalfunctionAttachment",

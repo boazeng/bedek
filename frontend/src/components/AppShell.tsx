@@ -17,6 +17,7 @@ export type NavKey =
   | 'admin'
   | 'system_admin'
   | 'professionals'      // sub-page of system_admin
+  | 'system_locations'   // sub-page of system_admin — system-wide locations catalog
   | 'company_professionals' // company-scope trade classifications (under admin)
   | 'project_structure'  // sub-page of admin — visual project-structure builder hub
   | 'system_users'       // sub-page of system_admin — super_admin users

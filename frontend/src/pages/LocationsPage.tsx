@@ -96,6 +96,33 @@ export default function LocationsPage({ onNavigate }: Props) {
     }
   }
 
+  const [importing, setImporting] = useState(false)
+  async function importFromSystem() {
+    const ok = await confirm({
+      title: 'ייבוא מיקומים מהמערכת',
+      message: 'פעולה זו תמחק את רשימת המיקומים הנוכחית של החברה ותחליף אותה ברשימת המיקומים של המערכת. להמשיך?',
+      variant: 'danger',
+      confirmLabel: 'ייבא והחלף',
+    })
+    if (!ok) return
+    setImporting(true)
+    try {
+      const res = await Locations.importFromSystem(
+        user?.role === 'super_admin' ? companyId ?? undefined : undefined,
+      )
+      await alert({
+        title: 'ייבוא הושלם',
+        message: `נוספו ${res.added} מיקומים · נמחקו ${res.deleted}.`,
+        variant: 'success',
+      })
+      load()
+    } catch (e) {
+      alert({ title: 'שגיאת ייבוא', message: String(e), variant: 'danger' })
+    } finally {
+      setImporting(false)
+    }
+  }
+
   async function remove(l: LocationRow) {
     const ok = await confirm({
       title: 'מחיקת מיקום',
@@ -163,6 +190,14 @@ export default function LocationsPage({ onNavigate }: Props) {
             style={{ padding: '8px 16px', fontSize: '0.85rem' }}
           >
             ← חזרה לניהול חברה
+          </button>
+          <button
+            onClick={importFromSystem}
+            className="tact-btn tact-btn-ghost"
+            disabled={importing}
+            title="החלף את רשימת המיקומים של החברה ברשימת המיקומים של המערכת"
+          >
+            {importing ? 'מייבא…' : '⟱ ייבוא ממערכת'}
           </button>
           <button onClick={openCreate} className="tact-btn tact-btn-primary">
             + מיקום חדש

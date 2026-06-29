@@ -21,6 +21,40 @@ def create_tables() -> None:
     ensure_schema_migrations()
 
 
+# Default system-wide location catalog (restored). Seeded once if the table is
+# empty so a fresh/upgraded deploy has the standard locations to start from.
+DEFAULT_SYSTEM_LOCATIONS = [
+    "סלון",
+    "מטבח",
+    "חדר שינה הורים",
+    "חדר שינה 1",
+    "חדר שינה 2",
+    "מקלחת כללית",
+    "מקלחת הורים",
+    "מרפסת שמש",
+    'ממ"ד',
+    "גג עליון",
+    "חדר מדרגות",
+    "לובי ראשי",
+    "לובי קומתי",
+]
+
+
+def ensure_system_locations() -> None:
+    """Populate the system_locations catalog with the defaults if it's empty."""
+    from .models import SystemLocation
+
+    db = SessionLocal()
+    try:
+        if db.query(SystemLocation).first():
+            return
+        for i, name in enumerate(DEFAULT_SYSTEM_LOCATIONS):
+            db.add(SystemLocation(name=name, sort_order=i, is_active=True))
+        db.commit()
+    finally:
+        db.close()
+
+
 def ensure_super_admin(email: str, password: str, full_name: str = "Administrator") -> int:
     """Create the super_admin if absent; always (re)set its password and reactivate.
     Returns the user id."""
@@ -48,6 +82,7 @@ def ensure_super_admin(email: str, password: str, full_name: str = "Administrato
 def run(email: str | None = None, password: str | None = None) -> dict:
     """Create tables and, if admin credentials are supplied, ensure the super_admin."""
     create_tables()
+    ensure_system_locations()
     email = email or os.environ.get("SEED_ADMIN_EMAIL")
     password = password or os.environ.get("SEED_ADMIN_PASSWORD")
     result: dict = {"tables": "ensured"}

@@ -12,6 +12,7 @@ import LocationsPage from './pages/LocationsPage'
 import AdminPage from './pages/AdminPage'
 import SystemAdminPage from './pages/SystemAdminPage'
 import ProfessionalsPage from './pages/ProfessionalsPage'
+import SystemLocationsPage from './pages/SystemLocationsPage'
 import CompanyProfessionalsPage from './pages/CompanyProfessionalsPage'
 import ProjectStructurePage from './pages/ProjectStructurePage'
 import ProjectEditorPage from './pages/ProjectEditorPage'
@@ -25,6 +26,7 @@ const SYSTEM_ADMIN_SUBPAGES: NavKey[] = [
   'companies',
   'system_users',
   'professionals',
+  'system_locations',
 ]
 // Sub-pages of the company admin (ניהול חברה).
 const ADMIN_SUBPAGES: NavKey[] = ['company_users', 'locations', 'company_professionals', 'project_structure']
@@ -77,6 +79,7 @@ function ProtectedShell() {
       {safe === 'admin' && <AdminPage onNavigate={setCurrent} />}
       {safe === 'system_admin' && <SystemAdminPage onNavigate={setCurrent} />}
       {safe === 'professionals' && <ProfessionalsPage onNavigate={setCurrent} />}
+      {safe === 'system_locations' && <SystemLocationsPage onNavigate={setCurrent} />}
       {safe === 'company_professionals' && <CompanyProfessionalsPage onNavigate={setCurrent} />}
       {safe === 'project_structure' && <ProjectStructurePage />}
       {safe === 'malfunctions' && (

@@ -596,6 +596,26 @@ export const Buyers = {
   remove: (id: number) => api<void>(`/api/buyers/${id}`, { method: 'DELETE' }),
 }
 
+/** System-wide catalog of location names (סלון, מטבח…). */
+export type SystemLocationRow = {
+  id: number
+  name: string
+  sort_order: number
+  is_active: boolean
+}
+
+export const SystemLocations = {
+  list: () => api<SystemLocationRow[]>('/api/system/locations'),
+  create: (body: Partial<SystemLocationRow>) =>
+    api<SystemLocationRow>('/api/system/locations', { method: 'POST', body }),
+  update: (id: number, body: Partial<SystemLocationRow>) =>
+    api<SystemLocationRow>(`/api/system/locations/${id}`, { method: 'PUT', body }),
+  remove: (id: number) =>
+    api<void>(`/api/system/locations/${id}`, { method: 'DELETE' }),
+  reorder: (ids: number[]) =>
+    api<void>('/api/system/locations/reorder', { method: 'POST', body: { ids } }),
+}
+
 export const Professionals = {
   list: () => api<ProfessionalRow[]>('/api/system/professionals'),
   create: (body: Partial<ProfessionalRow>) =>
@@ -712,6 +732,12 @@ export const Locations = {
     api<void>('/api/locations/reorder', {
       method: 'POST',
       body: { ids },
+      query: { company_id: companyId },
+    }),
+  /** Reset the company catalog to the system-wide default locations (full replace). */
+  importFromSystem: (companyId?: number) =>
+    api<{ added: number; deleted: number }>('/api/locations/import-system', {
+      method: 'POST',
       query: { company_id: companyId },
     }),
 }

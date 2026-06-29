@@ -132,6 +132,22 @@ class ProfessionalOut(BaseModel):
     is_active: bool
 
 
+# ---------- System locations (system-wide catalog of location names) ----------
+class SystemLocationIn(BaseModel):
+    name: str
+    sort_order: int = 0
+    is_active: bool = True
+
+
+class SystemLocationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    sort_order: int
+    is_active: bool
+
+
 # ---------- Company professionals (per-company trade classifications) ----------
 class CompanyProfessionalIn(BaseModel):
     name: str
