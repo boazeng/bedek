@@ -10,11 +10,43 @@ import { useAuth, useEffectiveCompanyId } from '../lib/AuthContext'
 import { inputStyle } from '../components/Modal'
 import MalfunctionTree from '../components/MalfunctionTree'
 import type { CollapseCmd } from '../components/builder/shared'
+import { useMemo } from 'react'
 
 type Props = { onOpenUnit: (projectId: number, unitId: number) => void }
 
+const UNIT_TYPE_LABEL: Record<string, string> = {
+  apartment: 'דירה',
+  parking: 'חניה',
+  storage: 'מחסן',
+  shop: 'חנות',
+  public_area: 'ציבורי',
+}
+
+type TreeFilter = { buildingId: number | null; entranceId: number | null; unitId: number | null }
+
+/** Prune the project tree to the chosen building / entrance / unit. */
+function filterTree(tree: ProjectItemNode[], f: TreeFilter): ProjectItemNode[] {
+  let buildings = tree
+  if (f.buildingId) buildings = buildings.filter((b) => b.id === f.buildingId)
+  return buildings.map((b) => {
+    let entrances = b.children
+    if (f.entranceId) entrances = entrances.filter((e) => e.id === f.entranceId)
+    if (!f.unitId) return { ...b, children: entrances }
+    const prunedEntrances = entrances.map((e) => {
+      const floors = e.children
+        .map((fl) => {
+          const units = fl.children.filter((u) => u.id === f.unitId)
+          return units.length ? { ...fl, children: units } : null
+        })
+        .filter((x): x is ProjectItemNode => x !== null)
+      return { ...e, children: floors }
+    })
+    return { ...b, children: prunedEntrances }
+  })
+}
+
 export default function MalfunctionsPage({ onOpenUnit }: Props) {
-  const { user, activeProject } = useAuth()
+  const { user, activeProject, workScope } = useAuth()
   const companyId = useEffectiveCompanyId()
   const [projects, setProjects] = useState<Project[]>([])
   const [projectId, setProjectId] = useState<number | null>(null)
@@ -23,8 +55,28 @@ export default function MalfunctionsPage({ onOpenUnit }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [collapseCmd, setCollapseCmd] = useState<CollapseCmd>({ all: false, n: 0 })
+  const [filter, setFilter] = useState<TreeFilter>({ buildingId: null, entranceId: null, unitId: null })
 
   const needsCompany = user?.role === 'super_admin' && !companyId
+
+  // Cascading filter option lists, derived from the project tree.
+  const fBuildings = useMemo(() => tree.filter((n) => n.kind === 'building'), [tree])
+  const fEntrances = useMemo(() => {
+    const b = fBuildings.find((x) => x.id === filter.buildingId)
+    return b ? b.children.filter((n) => n.kind === 'entrance') : []
+  }, [fBuildings, filter.buildingId])
+  const fUnits = useMemo(() => {
+    const b = fBuildings.find((x) => x.id === filter.buildingId)
+    const e = b?.children.find((x) => x.id === filter.entranceId)
+    if (!e) return [] as { node: ProjectItemNode; floor: string }[]
+    const out: { node: ProjectItemNode; floor: string }[] = []
+    for (const floor of e.children)
+      for (const u of floor.children) if (u.kind === 'unit') out.push({ node: u, floor: floor.name })
+    return out
+  }, [fBuildings, filter.buildingId, filter.entranceId])
+
+  const filteredTree = useMemo(() => filterTree(tree, filter), [tree, filter])
+  const isFiltered = !!(filter.buildingId || filter.entranceId || filter.unitId)
 
   useEffect(() => {
     if (needsCompany) return
@@ -41,6 +93,7 @@ export default function MalfunctionsPage({ onOpenUnit }: Props) {
 
   useEffect(() => {
     if (!projectId) return
+    setFilter({ buildingId: null, entranceId: null, unitId: null })
     setLoading(true)
     Promise.all([ProjectTree.list(projectId), Malfunctions.unitsWithDefects(projectId, null)])
       .then(([t, units]) => {
@@ -113,6 +166,107 @@ export default function MalfunctionsPage({ onOpenUnit }: Props) {
         </button>
       </div>
 
+      {/* Filters: building → entrance → unit, by-selection (top bar), or show all. */}
+      {projectId && tree.length > 0 && (
+        <div
+          style={{
+            display: 'flex',
+            gap: 10,
+            marginBottom: 14,
+            alignItems: 'flex-end',
+            flexWrap: 'wrap',
+            background: 'var(--color-bg-white)',
+            border: '1px solid var(--color-border)',
+            borderRadius: 12,
+            padding: '12px 14px',
+          }}
+        >
+          <label style={{ fontSize: '0.8rem' }}>
+            <div style={{ marginBottom: 4, color: 'var(--color-text-light)' }}>בניין</div>
+            <select
+              value={filter.buildingId ?? ''}
+              onChange={(e) =>
+                setFilter({
+                  buildingId: e.target.value ? Number(e.target.value) : null,
+                  entranceId: null,
+                  unitId: null,
+                })
+              }
+              style={{ ...inputStyle, minWidth: 150 }}
+            >
+              <option value="">הכל</option>
+              {fBuildings.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label style={{ fontSize: '0.8rem' }}>
+            <div style={{ marginBottom: 4, color: 'var(--color-text-light)' }}>כניסה</div>
+            <select
+              value={filter.entranceId ?? ''}
+              disabled={!filter.buildingId}
+              onChange={(e) =>
+                setFilter((f) => ({
+                  ...f,
+                  entranceId: e.target.value ? Number(e.target.value) : null,
+                  unitId: null,
+                }))
+              }
+              style={{ ...inputStyle, minWidth: 130 }}
+            >
+              <option value="">הכל</option>
+              {fEntrances.map((en) => (
+                <option key={en.id} value={en.id}>
+                  {en.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label style={{ fontSize: '0.8rem' }}>
+            <div style={{ marginBottom: 4, color: 'var(--color-text-light)' }}>יחידה</div>
+            <select
+              value={filter.unitId ?? ''}
+              disabled={!filter.entranceId}
+              onChange={(e) =>
+                setFilter((f) => ({ ...f, unitId: e.target.value ? Number(e.target.value) : null }))
+              }
+              style={{ ...inputStyle, minWidth: 170 }}
+            >
+              <option value="">הכל</option>
+              {fUnits.map(({ node, floor }) => (
+                <option key={node.id} value={node.id}>
+                  {UNIT_TYPE_LABEL[node.unit_type || ''] || 'יחידה'} {node.short_code || node.number || ''} · {floor}
+                </option>
+              ))}
+            </select>
+          </label>
+          <span style={{ flex: 1 }} />
+          <button
+            className="tact-btn tact-btn-ghost"
+            onClick={() =>
+              setFilter({
+                buildingId: workScope.buildingId,
+                entranceId: workScope.entranceId,
+                unitId: workScope.unitId,
+              })
+            }
+            disabled={!workScope.buildingId}
+            title="סנן לפי הבניין/כניסה/יחידה שנבחרו בסרגל העליון"
+          >
+            סנן לפי הבחירה
+          </button>
+          <button
+            className={isFiltered ? 'tact-btn tact-btn-primary' : 'tact-btn tact-btn-ghost'}
+            onClick={() => setFilter({ buildingId: null, entranceId: null, unitId: null })}
+            disabled={!isFiltered}
+          >
+            הצג הכל
+          </button>
+        </div>
+      )}
+
       {error && <div style={{ color: 'var(--color-accent)', marginBottom: 10 }}>{error}</div>}
 
       <div style={{ marginBottom: 10, fontSize: '0.85rem', color: 'var(--color-text-light)' }}>
@@ -130,7 +284,7 @@ export default function MalfunctionsPage({ onOpenUnit }: Props) {
       ) : (
         <MalfunctionTree
           projectId={projectId}
-          tree={tree}
+          tree={filteredTree}
           defectCounts={defectCounts}
           collapseCmd={collapseCmd}
           onOpenUnit={onOpenUnit}
