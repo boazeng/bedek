@@ -3,7 +3,6 @@ import {
   Malfunctions,
   Projects,
   ProjectTree,
-  type Project,
   type ProjectItemNode,
 } from '../lib/api'
 import { useAuth, useEffectiveCompanyId } from '../lib/AuthContext'
@@ -48,7 +47,6 @@ function filterTree(tree: ProjectItemNode[], f: TreeFilter): ProjectItemNode[] {
 export default function MalfunctionsPage({ onOpenUnit }: Props) {
   const { user, activeProject, workScope } = useAuth()
   const companyId = useEffectiveCompanyId()
-  const [projects, setProjects] = useState<Project[]>([])
   const [projectId, setProjectId] = useState<number | null>(null)
   const [tree, setTree] = useState<ProjectItemNode[]>([])
   const [defectCounts, setDefectCounts] = useState<Map<number, number>>(new Map())
@@ -56,6 +54,7 @@ export default function MalfunctionsPage({ onOpenUnit }: Props) {
   const [loading, setLoading] = useState(false)
   const [collapseCmd, setCollapseCmd] = useState<CollapseCmd>({ all: false, n: 0 })
   const [filter, setFilter] = useState<TreeFilter>({ buildingId: null, entranceId: null, unitId: null })
+  const [unitsOnly, setUnitsOnly] = useState(false)
 
   const needsCompany = user?.role === 'super_admin' && !companyId
 
@@ -82,7 +81,6 @@ export default function MalfunctionsPage({ onOpenUnit }: Props) {
     if (needsCompany) return
     Projects.list(user?.role === 'super_admin' ? companyId ?? undefined : undefined)
       .then((p) => {
-        setProjects(p)
         if (p.length && !projectId) {
           const active = activeProject && p.find((x) => x.id === activeProject.id)
           setProjectId(active ? active.id : p[0].id)
@@ -90,6 +88,11 @@ export default function MalfunctionsPage({ onOpenUnit }: Props) {
       })
       .catch((e) => setError(String(e)))
   }, [user?.role, companyId])
+
+  // Follow the globally-selected (active) project — no project field on screen.
+  useEffect(() => {
+    if (activeProject) setProjectId(activeProject.id)
+  }, [activeProject?.id])
 
   useEffect(() => {
     if (!projectId) return
@@ -128,27 +131,20 @@ export default function MalfunctionsPage({ onOpenUnit }: Props) {
       <div
         style={{
           display: 'flex',
-          gap: 12,
+          gap: 10,
           marginBottom: 16,
-          alignItems: 'flex-end',
+          alignItems: 'center',
           flexWrap: 'wrap',
         }}
       >
-        <label style={{ fontSize: '0.85rem' }}>
-          <div style={{ marginBottom: 4, color: 'var(--color-text-light)' }}>פרויקט</div>
-          <select
-            value={projectId ?? ''}
-            onChange={(e) => setProjectId(e.target.value ? Number(e.target.value) : null)}
-            style={{ ...inputStyle, minWidth: 240 }}
-          >
-            <option value="">— בחר פרויקט —</option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <button
+          className={unitsOnly ? 'tact-btn tact-btn-primary' : 'tact-btn tact-btn-ghost'}
+          onClick={() => setUnitsOnly((v) => !v)}
+          disabled={tree.length === 0}
+          title="הצג רק יחידות ממכר, ללא בניין/כניסה/קומות"
+        >
+          יחידות
+        </button>
         <span style={{ flex: 1 }} />
         <button
           className="tact-btn tact-btn-ghost"
@@ -288,6 +284,7 @@ export default function MalfunctionsPage({ onOpenUnit }: Props) {
           defectCounts={defectCounts}
           collapseCmd={collapseCmd}
           onOpenUnit={onOpenUnit}
+          flat={unitsOnly}
         />
       )}
     </div>

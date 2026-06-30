@@ -170,15 +170,26 @@ type Props = {
   defectCounts: Map<number, number>
   collapseCmd: CollapseCmd
   onOpenUnit: (projectId: number, unitId: number) => void
+  /** Units-only: flatten to sale units, hiding building/entrance/floor levels. */
+  flat?: boolean
+}
+
+function collectUnits(nodes: ProjectItemNode[]): ProjectItemNode[] {
+  const out: ProjectItemNode[] = []
+  const walk = (ns: ProjectItemNode[]) =>
+    ns.forEach((n) => (n.kind === 'unit' ? out.push(n) : walk(n.children)))
+  walk(nodes)
+  return out
 }
 
 export { nodeHasDefects }
 
-export default function MalfunctionTree({ projectId, tree, defectCounts, collapseCmd, onOpenUnit }: Props) {
-  if (tree.length === 0) {
+export default function MalfunctionTree({ projectId, tree, defectCounts, collapseCmd, onOpenUnit, flat }: Props) {
+  const items = flat ? collectUnits(tree) : tree
+  if (items.length === 0) {
     return (
       <div style={{ padding: '30px', textAlign: 'center', color: 'var(--color-text-light)' }}>
-        אין מבנה לפרויקט זה
+        {flat ? 'אין יחידות ממכר להצגה' : 'אין מבנה לפרויקט זה'}
       </div>
     )
   }
@@ -191,12 +202,12 @@ export default function MalfunctionTree({ projectId, tree, defectCounts, collaps
         overflow: 'hidden',
       }}
     >
-      {tree.map((b) => (
+      {items.map((n) => (
         <TreeNode
-          key={b.id}
+          key={n.id}
           projectId={projectId}
-          node={b}
-          depth={0}
+          node={n}
+          depth={flat ? 1 : 0}
           defectCounts={defectCounts}
           collapseCmd={collapseCmd}
           onOpenUnit={onOpenUnit}
