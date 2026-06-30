@@ -17,6 +17,7 @@ from .api import (
     professionals,
     project_items,
     projects,
+    reports,
     system_locations,
     users,
 )
@@ -55,6 +56,7 @@ def create_app() -> FastAPI:
     app.include_router(crm.router)
     app.include_router(project_items.router)
     app.include_router(malfunctions.router)
+    app.include_router(reports.router)
     app.include_router(buyers.router)
     app.include_router(attachments.router)
     return app

@@ -715,6 +715,63 @@ export const Malfunctions = {
     }),
 }
 
+// ---------- Reports ----------
+export type ReportRow = {
+  id: number
+  number: string | null
+  building_name: string | null
+  entrance_name: string | null
+  floor_name: string | null
+  unit_name: string | null
+  location_name: string | null
+  professional: string | null
+  status: string
+  status_label: string
+  source: string
+  source_label: string
+  group: string
+  group_label: string
+  description: string
+  opened_at: string
+  closed_at: string | null
+}
+
+export type ReportAppliedFilter = { label: string; value: string }
+
+export type ReportResponse = {
+  project_id: number
+  project_name: string
+  project_address: string | null
+  filters: ReportAppliedFilter[]
+  total: number
+  rows: ReportRow[]
+}
+
+export type ReportFilterParams = {
+  projectId: number
+  buildingId?: number | null
+  entranceId?: number | null
+  unitId?: number | null
+  professional?: string | null
+  status?: string | null
+  source?: string | null
+}
+
+export const Reports = {
+  malfunctions: (f: ReportFilterParams) =>
+    api<ReportResponse>('/api/reports/malfunctions', {
+      query: {
+        project_id: f.projectId,
+        building_id: f.buildingId ?? undefined,
+        entrance_id: f.entranceId ?? undefined,
+        unit_id: f.unitId ?? undefined,
+        professional: f.professional ?? undefined,
+        status: f.status ?? undefined,
+        source: f.source ?? undefined,
+      },
+    }),
+}
+
 // ---------- Attachments (files on a malfunction or a project item) ----------
 export type Attachment = {
   id: number
