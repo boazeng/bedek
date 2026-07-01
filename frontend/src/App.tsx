@@ -20,6 +20,7 @@ import ProjectEditorPage from './pages/ProjectEditorPage'
 import MalfunctionsPage from './pages/MalfunctionsPage'
 import OpenMalfunctionPage from './pages/OpenMalfunctionPage'
 import UnitDefectsPage from './pages/UnitDefectsPage'
+import UpdateMalfunctionsPage from './pages/UpdateMalfunctionsPage'
 
 // Pages reachable only from inside SystemAdminPage — not in the sidebar but
 // still valid as `current`. Gated implicitly by access to system_admin.
@@ -99,6 +100,7 @@ function ProtectedShell() {
           onNavigate={setCurrent}
         />
       )}
+      {safe === 'update_malfunctions' && <UpdateMalfunctionsPage />}
     </AppShell>
   )
 }

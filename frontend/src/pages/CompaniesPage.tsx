@@ -21,7 +21,9 @@ export default function CompaniesPage() {
   const [syncing, setSyncing] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [loadingCrm, setLoadingCrm] = useState(false)
-  const [crmList, setCrmList] = useState<{ id: number; name: string; linked: boolean }[]>([])
+  const [crmList, setCrmList] = useState<
+    { id: number; name: string; company_number: number | null; linked: boolean }[]
+  >([])
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [rows, setRows] = useState<Company[]>([])
   const [loading, setLoading] = useState(true)
@@ -322,6 +324,15 @@ export default function CompaniesPage() {
                   onChange={() => toggleSelect(c.id)}
                 />
                 <span style={{ flex: 1, fontSize: '0.9rem' }}>{c.name}</span>
+                {c.company_number != null && (
+                  <span
+                    className="tact-badge"
+                    style={{ fontFamily: 'var(--font-family-en)', fontSize: '0.72rem' }}
+                    title="מספר חברה ב-CRM"
+                  >
+                    {c.company_number}
+                  </span>
+                )}
                 <span style={{ fontSize: '0.72rem', color: 'var(--color-text-light)', fontFamily: 'var(--font-family-en)' }}>
                   #{c.id}
                 </span>

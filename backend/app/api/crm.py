@@ -133,11 +133,14 @@ def crm_status(
         "configured": crm_client.is_configured(),
         "crm_company_id": company.crm_company_id,
         "crm_company_name": None,
+        "crm_company_number": None,
         "error": None,
     }
     if out["configured"] and company.crm_company_id:
         try:
-            out["crm_company_name"] = crm_client.get_company(company.crm_company_id).get("name")
+            info = crm_client.get_company(company.crm_company_id)
+            out["crm_company_name"] = info.get("name")
+            out["crm_company_number"] = info.get("company_number")
         except crm_client.CrmError as e:
             out["error"] = str(e)
     return out

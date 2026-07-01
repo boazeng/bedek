@@ -73,11 +73,12 @@ def list_units_with_defects(
 def list_defects_for_unit(
     project_id: int = Query(...),
     unit_id: int = Query(...),
+    all_statuses: bool = Query(default=False, alias="all"),
     db: Session = Depends(get_db),
     actor: User = Depends(get_current_user),
 ):
     _get_project_or_403(project_id, actor, db)
-    return svc.list_defects_for_unit(db, project_id, unit_id)
+    return svc.list_defects_for_unit(db, project_id, unit_id, include_all=all_statuses)
 
 
 @router.get("/{defect_id}", response_model=MalfunctionDetail)

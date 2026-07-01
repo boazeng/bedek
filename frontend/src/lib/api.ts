@@ -170,6 +170,8 @@ export type CrmStatus = {
   configured: boolean
   crm_company_id: number | null
   crm_company_name: string | null
+  /** 5-digit CRM company number (Priority-style). Additive; may be null. */
+  crm_company_number: number | null
   error: string | null
 }
 
@@ -468,7 +470,9 @@ export const Users = {
 export const Crm = {
   /** CRM companies for the import picker (each flagged if already linked). super_admin. */
   companies: () =>
-    api<{ id: number; name: string; linked: boolean }[]>('/api/crm/companies'),
+    api<{ id: number; name: string; company_number: number | null; linked: boolean }[]>(
+      '/api/crm/companies',
+    ),
   /** Create/link the chosen CRM companies + auto-import their projects. super_admin. */
   importCompanies: (ids: number[]) =>
     api<{
@@ -698,9 +702,9 @@ export const Malfunctions = {
     api<UnitWithDefects[]>('/api/malfunctions/units', {
       query: { project_id: projectId, building_id: buildingId ?? undefined },
     }),
-  byUnit: (projectId: number, unitId: number) =>
+  byUnit: (projectId: number, unitId: number, allStatuses = false) =>
     api<MalfunctionListRow[]>('/api/malfunctions/by-unit', {
-      query: { project_id: projectId, unit_id: unitId },
+      query: { project_id: projectId, unit_id: unitId, all: allStatuses ? 'true' : undefined },
     }),
   get: (defectId: number) =>
     api<MalfunctionDetail>(`/api/malfunctions/${defectId}`),
@@ -716,13 +720,25 @@ export const Malfunctions = {
 }
 
 // ---------- Reports ----------
+export type ReportActivity = {
+  number: string | null
+  occurred_on: string
+  action: string
+  notes: string | null
+  performed_by: string | null
+}
+
 export type ReportRow = {
   id: number
   number: string | null
+  short_number: string | null
+  building_id: number | null
   building_name: string | null
+  entrance_id: number | null
   entrance_name: string | null
-  floor_name: string | null
+  unit_id: number | null
   unit_name: string | null
+  floor_name: string | null
   location_name: string | null
   professional: string | null
   status: string
@@ -734,6 +750,7 @@ export type ReportRow = {
   description: string
   opened_at: string
   closed_at: string | null
+  activities: ReportActivity[]
 }
 
 export type ReportAppliedFilter = { label: string; value: string }

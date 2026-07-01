@@ -272,9 +272,11 @@ def list_units_with_defects(
 
 
 def list_defects_for_unit(
-    db: Session, project_id: int, unit_id: int
+    db: Session, project_id: int, unit_id: int, include_all: bool = False
 ) -> list[MalfunctionListItem]:
-    """All open defects on this unit and all its descendant locations."""
+    """Defects on this unit and all its descendant locations. By default only
+    open defects; pass include_all=True to include closed/cancelled ones (used
+    by the defect-management screen)."""
     _, by_parent = _project_items_by_parent(db, project_id)
     item_ids = set(_descendants_of(unit_id, by_parent))
 
@@ -284,16 +286,13 @@ def list_defects_for_unit(
         .filter(ProjectItem.id.in_(item_ids))
         .all()
     }
-    defects = (
-        db.query(Malfunction)
-        .filter(
-            Malfunction.project_id == project_id,
-            Malfunction.status.in_(OPEN_STATUSES),
-            Malfunction.project_item_id.in_(item_ids),
-        )
-        .order_by(Malfunction.opened_at.desc())
-        .all()
+    q = db.query(Malfunction).filter(
+        Malfunction.project_id == project_id,
+        Malfunction.project_item_id.in_(item_ids),
     )
+    if not include_all:
+        q = q.filter(Malfunction.status.in_(OPEN_STATUSES))
+    defects = q.order_by(Malfunction.opened_at.desc()).all()
     loc_name = _location_names(db, [d.location_id for d in defects])
     unit_numbers = _unit_numbers(db, project_id)
     return [

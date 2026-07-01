@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import {
   CompanyProfessionals,
   Projects,
@@ -12,6 +12,7 @@ import {
 import { useAuth, useEffectiveCompanyId } from '../lib/AuthContext'
 import { inputStyle } from '../components/Modal'
 import { buildReportHtml } from '../components/reportPrint'
+import { groupReportRows } from '../lib/reportGroup'
 
 const UNIT_TYPE_LABEL: Record<string, string> = {
   apartment: 'דירה',
@@ -356,46 +357,88 @@ export default function ReportsPage() {
               <div className="tact-kpi-label">לא נמצאו תקלות התואמות את הסינון</div>
             </div>
           ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table
-                style={{
-                  width: '100%',
-                  borderCollapse: 'collapse',
-                  background: 'var(--color-bg-white)',
-                  fontSize: '0.82rem',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: 12,
-                  overflow: 'hidden',
-                }}
-              >
-                <thead>
-                  <tr style={{ background: 'var(--color-bg)', textAlign: 'right' }}>
-                    {['מס\'', 'בניין', 'כניסה', 'דירה', 'מיקום', 'בעל מקצוע', 'סטטוס', 'מקור', 'נפתח', 'תיאור'].map(
-                      (h) => (
-                        <th key={h} style={thStyle}>
-                          {h}
-                        </th>
-                      ),
-                    )}
-                  </tr>
-                </thead>
-                <tbody>
-                  {report.rows.map((r) => (
-                    <tr key={r.id} style={{ borderTop: '1px solid var(--color-border)' }}>
-                      <td style={tdStyle}>{r.number || ''}</td>
-                      <td style={tdStyle}>{r.building_name || ''}</td>
-                      <td style={tdStyle}>{r.entrance_name || ''}</td>
-                      <td style={tdStyle}>{r.unit_name || ''}</td>
-                      <td style={tdStyle}>{r.location_name || ''}</td>
-                      <td style={tdStyle}>{r.professional || ''}</td>
-                      <td style={tdStyle}>{r.status_label}</td>
-                      <td style={tdStyle}>{r.source_label}</td>
-                      <td style={tdStyle}>{r.opened_at}</td>
-                      <td style={{ ...tdStyle, maxWidth: 320 }}>{r.description}</td>
-                    </tr>
+            <div>
+              {groupReportRows(report.rows).map((sec) => (
+                <section key={sec.key} style={{ marginBottom: 18 }}>
+                  <div
+                    style={{
+                      fontWeight: 700,
+                      color: '#fff',
+                      background: 'var(--color-primary)',
+                      padding: '6px 12px',
+                      borderRadius: 8,
+                      fontSize: '0.92rem',
+                    }}
+                  >
+                    {[sec.buildingName, sec.entranceName].filter(Boolean).join(' · ') || '—'}
+                  </div>
+                  {sec.units.map((u) => (
+                    <div key={`${sec.key}-${u.unitId ?? 'none'}`} style={{ margin: '8px 0 12px' }}>
+                      <div style={{ fontWeight: 700, color: 'var(--color-primary)', margin: '8px 2px 4px', fontSize: '0.85rem' }}>
+                        {[u.unitName || 'ללא יחידה', u.floorName].filter(Boolean).join(' · ')}{' '}
+                        <span style={{ color: 'var(--color-text-light)', fontWeight: 400, fontSize: '0.78rem' }}>
+                          ({u.rows.length})
+                        </span>
+                      </div>
+                      <table
+                        style={{
+                          width: '100%',
+                          borderCollapse: 'collapse',
+                          background: 'var(--color-bg-white)',
+                          fontSize: '0.82rem',
+                          border: '1px solid var(--color-border)',
+                          borderRadius: 10,
+                          overflow: 'hidden',
+                        }}
+                      >
+                        <thead>
+                          <tr style={{ background: 'var(--color-bg)', textAlign: 'right' }}>
+                            {['מספר', 'מיקום', 'תיאור התקלה', 'מקצוע', 'סטטוס'].map((h) => (
+                              <th key={h} style={thStyle}>
+                                {h}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {u.rows.map((r) => (
+                            <Fragment key={r.id}>
+                              <tr style={{ borderTop: '1px solid var(--color-border)' }}>
+                                <td style={{ ...tdStyle, whiteSpace: 'nowrap', fontWeight: 600 }}>{r.short_number || ''}</td>
+                                <td style={tdStyle}>{r.location_name || ''}</td>
+                                <td style={{ ...tdStyle, maxWidth: 360 }}>{r.description}</td>
+                                <td style={tdStyle}>{r.professional || ''}</td>
+                                <td style={tdStyle}>{r.status_label}</td>
+                              </tr>
+                              {r.activities.length > 0 && (
+                                <tr>
+                                  <td />
+                                  <td colSpan={4} style={{ ...tdStyle, background: '#FCFBF7' }}>
+                                    <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--color-text-light)', marginBottom: 2 }}>
+                                      פעילויות
+                                    </div>
+                                    <ul style={{ margin: 0, paddingInlineStart: 16 }}>
+                                      {r.activities.map((a, i) => (
+                                        <li key={i} style={{ fontSize: '0.74rem', color: '#4a4a4a' }}>
+                                          <span style={{ color: 'var(--color-text-light)' }}>
+                                            {[a.occurred_on, a.performed_by].filter(Boolean).join(' · ')}
+                                          </span>{' '}
+                                          {a.action}
+                                          {a.notes ? ` — ${a.notes}` : ''}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </td>
+                                </tr>
+                              )}
+                            </Fragment>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   ))}
-                </tbody>
-              </table>
+                </section>
+              ))}
             </div>
           )}
         </>

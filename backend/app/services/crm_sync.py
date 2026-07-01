@@ -33,7 +33,14 @@ def list_crm_companies(db: Session) -> list[dict]:
         .all()
     }
     return [
-        {"id": int(c["id"]), "name": c.get("name"), "linked": int(c["id"]) in linked_ids}
+        {
+            "id": int(c["id"]),
+            "name": c.get("name"),
+            # 5-digit CRM company number (Priority-style). Additive field exposed
+            # by CRM 2026-07-01; may be absent for older CRM deployments.
+            "company_number": c.get("company_number"),
+            "linked": int(c["id"]) in linked_ids,
+        }
         for c in crm_companies
     ]
 
