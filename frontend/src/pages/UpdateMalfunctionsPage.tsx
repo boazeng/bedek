@@ -1,29 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   Malfunctions,
-  Projects,
   ProjectTree,
   type MalfunctionDetail,
   type MalfunctionListRow,
-  type Project,
   type ProjectItemNode,
 } from '../lib/api'
-import { useAuth, useEffectiveCompanyId } from '../lib/AuthContext'
+import { useAuth } from '../lib/AuthContext'
 import { useAlert } from '../components/Dialog'
-import { inputStyle } from '../components/Modal'
 import { DefectRow } from '../components/DefectDetail'
 import DefectFormDialog from '../components/DefectFormDialog'
 import ActivityFormDialog from '../components/ActivityFormDialog'
 
-const UNIT_TYPE_LABEL: Record<string, string> = {
-  apartment: 'דירה',
-  parking: 'חניה',
-  storage: 'מחסן',
-  shop: 'חנות',
-  public_area: 'ציבורי',
-}
-
-type Filters = { buildingId: number | null; entranceId: number | null; unitId: number | null }
 type GroupBy = 'location' | 'professional'
 
 const NO_LOCATION = 'ללא מיקום'
@@ -72,36 +60,18 @@ function groupDefects(defects: MalfunctionListRow[], by: GroupBy): DefectGroup[]
     })
 }
 
-const inlineFieldStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 8,
-  fontSize: '0.85rem',
-}
-const inlineLabelStyle: React.CSSProperties = {
-  color: 'var(--color-text-light)',
-  whiteSpace: 'nowrap',
-}
-
 export default function UpdateMalfunctionsPage() {
   const { user, activeProject, workScope } = useAuth()
-  const companyId = useEffectiveCompanyId()
   const alert = useAlert()
   const canWrite = user?.role === 'super_admin' || user?.role === 'company_admin'
 
-  const [projects, setProjects] = useState<Project[]>([])
-  const [projectId, setProjectId] = useState<number | null>(activeProject?.id ?? null)
-  const [tree, setTree] = useState<ProjectItemNode[]>([])
-  const [filter, setFilter] = useState<Filters>({
-    buildingId: workScope.buildingId,
-    entranceId: workScope.entranceId,
-    unitId: workScope.unitId,
-  })
-  const [groupBy, setGroupBy] = useState<GroupBy>('location')
+  const projectId = activeProject?.id ?? null
+  const unitId = workScope.unitId
 
   const [defects, setDefects] = useState<MalfunctionListRow[]>([])
   const [unit, setUnit] = useState<ProjectItemNode | null>(null)
   const [ancestors, setAncestors] = useState<ProjectItemNode[]>([])
+  const [groupBy, setGroupBy] = useState<GroupBy>('location')
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
   const [details, setDetails] = useState<Map<number, MalfunctionDetail>>(new Map())
   const [loading, setLoading] = useState(false)
@@ -111,54 +81,20 @@ export default function UpdateMalfunctionsPage() {
   const [editingDefect, setEditingDefect] = useState<MalfunctionDetail | null>(null)
   const [activityFormOpenFor, setActivityFormOpenFor] = useState<number | null>(null)
 
-  const needsCompany = user?.role === 'super_admin' && !companyId
-
-  // Cascading option lists from the tree.
-  const buildings = useMemo(() => tree.filter((n) => n.kind === 'building'), [tree])
-  const entrances = useMemo(() => {
-    const b = buildings.find((x) => x.id === filter.buildingId)
-    return b ? b.children.filter((n) => n.kind === 'entrance') : []
-  }, [buildings, filter.buildingId])
-  const units = useMemo(() => {
-    const b = buildings.find((x) => x.id === filter.buildingId)
-    const e = b?.children.find((x) => x.id === filter.entranceId)
-    if (!e) return [] as { node: ProjectItemNode; floor: string }[]
-    const out: { node: ProjectItemNode; floor: string }[] = []
-    for (const floor of e.children)
-      for (const u of floor.children) if (u.kind === 'unit') out.push({ node: u, floor: floor.name })
-    return out
-  }, [buildings, filter.buildingId, filter.entranceId])
-
-  useEffect(() => {
-    if (needsCompany) return
-    Projects.list(user?.role === 'super_admin' ? companyId ?? undefined : undefined)
-      .then((p) => {
-        setProjects(p)
-        if (p.length && !projectId) setProjectId(p[0].id)
-      })
-      .catch((e) => setError(String(e)))
-  }, [user?.role, companyId])
-
-  useEffect(() => {
-    if (!projectId) return
-    ProjectTree.list(projectId)
-      .then(setTree)
-      .catch((e) => setError(String(e)))
-  }, [projectId])
-
   function load() {
-    if (!projectId || !filter.unitId) {
+    if (!projectId || !unitId) {
       setDefects([])
       setUnit(null)
       setAncestors([])
       return
     }
     setLoading(true)
-    Promise.all([Malfunctions.byUnit(projectId, filter.unitId, true), ProjectTree.list(projectId)])
+    setError(null)
+    Promise.all([Malfunctions.byUnit(projectId, unitId, true), ProjectTree.list(projectId)])
       .then(([d, t]) => {
         setDefects(d)
-        setUnit(findItem(t, filter.unitId!))
-        setAncestors(findAncestors(t, filter.unitId!))
+        setUnit(findItem(t, unitId))
+        setAncestors(findAncestors(t, unitId))
       })
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false))
@@ -167,7 +103,7 @@ export default function UpdateMalfunctionsPage() {
     setExpanded(new Set())
     setDetails(new Map())
     load()
-  }, [projectId, filter.unitId])
+  }, [projectId, unitId])
 
   async function toggle(defectId: number) {
     setExpanded((prev) => {
@@ -193,119 +129,29 @@ export default function UpdateMalfunctionsPage() {
 
   const groups = useMemo(() => groupDefects(defects, groupBy), [defects, groupBy])
 
-  if (needsCompany) {
+  // No unit chosen in the top bar → prompt the user to pick one.
+  if (!projectId || !unitId) {
     return (
-      <div className="tact-kpi" style={{ textAlign: 'center' }}>
-        <div className="tact-kpi-label">בחר חברה כדי לעדכן תקלות</div>
+      <div
+        className="tact-kpi"
+        style={{ textAlign: 'center', padding: '56px 20px', border: '1px dashed var(--color-border)' }}
+      >
+        <div style={{ fontSize: '2rem', marginBottom: 10 }}>🏠</div>
+        <div className="tact-kpi-label" style={{ fontSize: '1rem' }}>
+          יש לבחור יחידה כדי לעדכן תקלות
+        </div>
+        <div style={{ fontSize: '0.85rem', color: 'var(--color-text-light)', marginTop: 6 }}>
+          בחר פרויקט · בניין · כניסה · יחידה בסרגל שבראש המסך
+        </div>
       </div>
     )
   }
 
   return (
     <div>
-      {/* Unit picker — labels inline with their fields */}
-      <div
-        style={{
-          display: 'flex',
-          gap: 16,
-          marginBottom: 14,
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          background: 'var(--color-bg-white)',
-          border: '1px solid var(--color-border)',
-          borderRadius: 12,
-          padding: '12px 14px',
-        }}
-      >
-        <label style={inlineFieldStyle}>
-          <span style={inlineLabelStyle}>פרויקט</span>
-          <select
-            value={projectId ?? ''}
-            onChange={(e) => {
-              setProjectId(e.target.value ? Number(e.target.value) : null)
-              setFilter({ buildingId: null, entranceId: null, unitId: null })
-            }}
-            style={{ ...inputStyle, minWidth: 220 }}
-          >
-            <option value="">— בחר פרויקט —</option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label style={inlineFieldStyle}>
-          <span style={inlineLabelStyle}>בניין</span>
-          <select
-            value={filter.buildingId ?? ''}
-            onChange={(e) =>
-              setFilter({
-                buildingId: e.target.value ? Number(e.target.value) : null,
-                entranceId: null,
-                unitId: null,
-              })
-            }
-            style={{ ...inputStyle, minWidth: 140 }}
-          >
-            <option value="">— בחר —</option>
-            {buildings.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label style={inlineFieldStyle}>
-          <span style={inlineLabelStyle}>כניסה</span>
-          <select
-            value={filter.entranceId ?? ''}
-            disabled={!filter.buildingId}
-            onChange={(e) =>
-              setFilter((f) => ({
-                ...f,
-                entranceId: e.target.value ? Number(e.target.value) : null,
-                unitId: null,
-              }))
-            }
-            style={{ ...inputStyle, minWidth: 120 }}
-          >
-            <option value="">— בחר —</option>
-            {entrances.map((en) => (
-              <option key={en.id} value={en.id}>
-                {en.name}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label style={inlineFieldStyle}>
-          <span style={inlineLabelStyle}>יחידה</span>
-          <select
-            value={filter.unitId ?? ''}
-            disabled={!filter.entranceId}
-            onChange={(e) => setFilter((f) => ({ ...f, unitId: e.target.value ? Number(e.target.value) : null }))}
-            style={{ ...inputStyle, minWidth: 200 }}
-          >
-            <option value="">— בחר יחידה —</option>
-            {units.map(({ node, floor }) => (
-              <option key={node.id} value={node.id}>
-                {UNIT_TYPE_LABEL[node.unit_type || ''] || 'יחידה'} {node.short_code || node.number || ''} · {floor}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-
       {error && <div style={{ color: 'var(--color-accent)', marginBottom: 10 }}>{error}</div>}
 
-      {!filter.unitId ? (
-        <div className="tact-kpi" style={{ textAlign: 'center', padding: '48px 20px', border: '1px dashed var(--color-border)' }}>
-          <div className="tact-kpi-label">בחר יחידה כדי להציג את התקלות שלה</div>
-        </div>
-      ) : loading ? (
+      {loading ? (
         <div style={{ color: 'var(--color-text-light)' }}>טוען…</div>
       ) : (
         <>
@@ -366,9 +212,7 @@ export default function UpdateMalfunctionsPage() {
                 מקצועות
               </button>
             </div>
-            <span style={{ fontSize: '0.82rem', color: 'var(--color-text-light)' }}>
-              {defects.length} תקלות
-            </span>
+            <span style={{ fontSize: '0.82rem', color: 'var(--color-text-light)' }}>{defects.length} תקלות</span>
             <span style={{ flex: 1 }} />
             {canWrite && (
               <button
@@ -440,8 +284,8 @@ export default function UpdateMalfunctionsPage() {
         mode={
           editingDefect
             ? { kind: 'edit', defect: editingDefect }
-            : defectFormOpen && projectId && filter.unitId
-              ? { kind: 'create', projectId, unitId: filter.unitId }
+            : defectFormOpen && projectId && unitId
+              ? { kind: 'create', projectId, unitId }
               : null
         }
         unitSubtree={unit}

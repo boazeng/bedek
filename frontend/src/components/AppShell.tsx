@@ -35,8 +35,8 @@ type NavItem = {
 const MAIN_NAV: NavItem[] = [
   { key: 'dashboard',  label: 'דף הבית',     icon: 'dashboard',  roles: ['super_admin', 'company_admin', 'company_user', 'end_customer'] },
   { key: 'open_malfunction', label: 'פתיחת תקלה', icon: 'tool', roles: ['super_admin', 'company_admin', 'company_user'] },
+  { key: 'update_malfunctions', label: 'עידכון תקלות ליחידה', icon: 'check', roles: ['super_admin', 'company_admin', 'company_user'] },
   { key: 'malfunctions', label: 'תקלות',      icon: 'alert',      roles: ['super_admin', 'company_admin', 'company_user'] },
-  { key: 'update_malfunctions', label: 'עידכון תקלות', icon: 'check', roles: ['super_admin', 'company_admin', 'company_user'] },
   { key: 'reports',    label: 'דוחות',         icon: 'document',   roles: ['super_admin', 'company_admin', 'company_user'] },
   { key: 'projects',   label: 'פרויקטים',      icon: 'briefcase',  roles: ['super_admin', 'company_admin', 'company_user'] },
   { key: 'customers',  label: 'לקוחות',        icon: 'users',      roles: ['super_admin', 'company_admin', 'company_user'] },
