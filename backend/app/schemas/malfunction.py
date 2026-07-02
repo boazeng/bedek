@@ -86,6 +86,9 @@ class MalfunctionDetail(BaseModel):
     assigned_to: str | None
     opened_at: date
     closed_at: date | None
+    customer_signed: bool = False
+    customer_signature: str | None = None
+    customer_signed_at: date | None = None
     created_at: datetime
     updated_at: datetime
     activities: list[MalfunctionActivityOut] = []
@@ -99,6 +102,9 @@ class MalfunctionUpdate(BaseModel):
     status: str | None = None
     group: str | None = None
     closed_at: date | None = None
+    customer_signed: bool | None = None
+    customer_signature: str | None = None   # base64 PNG data-URL; "" clears it
+    customer_signed_at: date | None = None
 
 
 class MalfunctionCreate(BaseModel):
@@ -114,6 +120,9 @@ class MalfunctionCreate(BaseModel):
     group: str = "unassigned"
     professional: str | None = None
     opened_at: date | None = None   # defaults to today server-side
+    customer_signed: bool = False
+    customer_signature: str | None = None
+    customer_signed_at: date | None = None
 
 
 class MalfunctionActivityCreate(BaseModel):

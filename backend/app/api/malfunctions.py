@@ -126,6 +126,9 @@ def create_defect(
         description=body.description,
         professional=body.professional or None,
         opened_at=body.opened_at or date.today(),
+        customer_signed=body.customer_signed,
+        customer_signature=body.customer_signature or None,
+        customer_signed_at=body.customer_signed_at,
         seq=svc.next_defect_seq(db, body.project_id, body.project_item_id),
     )
     db.add(d)
@@ -201,5 +204,16 @@ def update_defect(
         d.group = body.group
     if body.closed_at is not None:
         d.closed_at = body.closed_at
+    if body.customer_signed is not None:
+        d.customer_signed = body.customer_signed
+        if not body.customer_signed:
+            # Marked as not-signed → drop any stored signature + date.
+            d.customer_signature = None
+            d.customer_signed_at = None
+    if body.customer_signed is None or body.customer_signed:
+        if body.customer_signature is not None:
+            d.customer_signature = body.customer_signature or None
+        if body.customer_signed_at is not None:
+            d.customer_signed_at = body.customer_signed_at
     db.commit()
     return svc.get_defect(db, defect_id)

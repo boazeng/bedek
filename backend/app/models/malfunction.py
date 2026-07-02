@@ -1,7 +1,7 @@
 from datetime import datetime, date
 from enum import StrEnum
 
-from sqlalchemy import String, DateTime, Date, ForeignKey, Index, Text, Integer
+from sqlalchemy import String, DateTime, Date, ForeignKey, Index, Text, Integer, Boolean
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..database import Base
@@ -88,6 +88,12 @@ class Malfunction(Base):
     opened_at: Mapped[date] = mapped_column(Date, default=date.today, nullable=False)
     closed_at: Mapped[date | None] = mapped_column(Date)
     assigned_to: Mapped[str | None] = mapped_column(String(200))
+
+    # Customer sign-off on the defect handling.
+    customer_signed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Drawn signature stored as a base64 PNG data-URL.
+    customer_signature: Mapped[str | None] = mapped_column(Text)
+    customer_signed_at: Mapped[date | None] = mapped_column(Date)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, nullable=False

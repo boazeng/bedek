@@ -343,6 +343,9 @@ export type MalfunctionDetail = {
   assigned_to: string | null
   opened_at: string
   closed_at: string | null
+  customer_signed: boolean
+  customer_signature: string | null
+  customer_signed_at: string | null
   created_at: string
   updated_at: string
   activities: MalfunctionActivity[]
@@ -676,6 +679,9 @@ export type MalfunctionCreatePayload = {
   professional?: string | null
   opened_at?: string | null
   buyer_id?: number | null
+  customer_signed?: boolean
+  customer_signature?: string | null
+  customer_signed_at?: string | null
 }
 
 export type MalfunctionUpdatePayload = {
@@ -684,6 +690,9 @@ export type MalfunctionUpdatePayload = {
   status?: string
   group?: string
   closed_at?: string | null
+  customer_signed?: boolean
+  customer_signature?: string | null
+  customer_signed_at?: string | null
 }
 
 export type MalfunctionActivityCreatePayload = {

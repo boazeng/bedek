@@ -375,6 +375,9 @@ def get_defect(db: Session, defect_id: int) -> MalfunctionDetail | None:
         assigned_to=d.assigned_to,
         opened_at=d.opened_at,
         closed_at=d.closed_at,
+        customer_signed=bool(d.customer_signed),
+        customer_signature=d.customer_signature,
+        customer_signed_at=d.customer_signed_at,
         created_at=d.created_at,
         updated_at=d.updated_at,
         activities=[

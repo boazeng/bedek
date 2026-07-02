@@ -47,6 +47,9 @@ _INPLACE_COLUMN_MIGRATIONS: list[tuple[str, str, str]] = [
     ("buyers", "nickname", "VARCHAR(100)"),
     ("malfunctions", "seq", "INTEGER NOT NULL DEFAULT 0"),
     ("malfunction_activities", "seq", "INTEGER NOT NULL DEFAULT 0"),
+    ("malfunctions", "customer_signed", "BOOLEAN NOT NULL DEFAULT FALSE"),
+    ("malfunctions", "customer_signature", "TEXT"),
+    ("malfunctions", "customer_signed_at", "DATE"),
 ]
 
 

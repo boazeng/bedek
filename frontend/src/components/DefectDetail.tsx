@@ -1,5 +1,6 @@
 import type { MalfunctionDetail, MalfunctionListRow } from '../lib/api'
 import AttachmentsPanel from './AttachmentsPanel'
+import TactIcon from './TactIcon'
 
 export const STATUS_LABEL: Record<string, string> = {
   pending_manager: 'ממתין לאישור',
@@ -84,7 +85,7 @@ export function DefectRow({
           border: 'none',
           padding: '12px 16px',
           display: 'grid',
-          gridTemplateColumns: compact ? '24px 1fr 140px 110px 110px' : '24px 1fr 110px 100px 100px 110px',
+          gridTemplateColumns: compact ? '24px 1fr 140px 110px 110px 32px' : '24px 1fr 110px 100px 100px 110px 32px',
           gap: 10,
           alignItems: 'center',
           cursor: 'pointer',
@@ -95,9 +96,18 @@ export function DefectRow({
         <span style={{ color: 'var(--color-primary)', fontSize: '0.8rem' }}>
           {expanded ? '▼' : '◀'}
         </span>
-        <span style={{ fontWeight: 500, fontSize: '0.95rem', display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <span
+          style={{
+            fontWeight: 500,
+            fontSize: '0.95rem',
+            display: 'flex',
+            flexDirection: compact ? 'row' : 'column',
+            gap: compact ? 8 : 2,
+            alignItems: compact ? 'baseline' : 'stretch',
+          }}
+        >
           {shownNumber && (
-            <code style={{ fontFamily: 'var(--font-family-en)', fontSize: '0.72rem', color: 'var(--color-primary)' }}>
+            <code style={{ fontFamily: 'var(--font-family-en)', fontSize: '0.72rem', color: 'var(--color-primary)', whiteSpace: 'nowrap' }}>
               {shownNumber}
             </code>
           )}
@@ -123,6 +133,34 @@ export function DefectRow({
         <span style={{ fontSize: '0.78rem', color: 'var(--color-text-light)' }}>
           {new Date(defect.opened_at).toLocaleDateString('he-IL')}
         </span>
+        {canWrite ? (
+          <span
+            role="button"
+            tabIndex={0}
+            title="ערוך תקלה"
+            onClick={(e) => {
+              e.stopPropagation()
+              onEdit()
+            }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--color-text-light)',
+              cursor: 'pointer',
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLSpanElement).style.color = 'var(--color-primary)'
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLSpanElement).style.color = 'var(--color-text-light)'
+            }}
+          >
+            <TactIcon name="edit" size={16} />
+          </span>
+        ) : (
+          <span />
+        )}
       </button>
 
       {expanded && (
