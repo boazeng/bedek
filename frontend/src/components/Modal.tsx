@@ -95,11 +95,41 @@ export function Field({
   label,
   children,
   hint,
+  inline = false,
 }: {
   label: string
   children: ReactNode
   hint?: string
+  /** Render the label on the same line as the input (label first, then field). */
+  inline?: boolean
 }) {
+  const hintNode = hint && (
+    <div style={{ fontSize: '0.72rem', color: 'var(--color-text-light)', marginTop: 4 }}>
+      {hint}
+    </div>
+  )
+
+  if (inline) {
+    return (
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <label
+            style={{
+              fontSize: '0.78rem',
+              fontWeight: 600,
+              color: 'var(--color-text-light)',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {label}
+          </label>
+          <div style={{ flex: 1, minWidth: 0 }}>{children}</div>
+        </div>
+        {hintNode}
+      </div>
+    )
+  }
+
   return (
     <div style={{ marginBottom: 14 }}>
       <label
@@ -114,11 +144,7 @@ export function Field({
         {label}
       </label>
       {children}
-      {hint && (
-        <div style={{ fontSize: '0.72rem', color: 'var(--color-text-light)', marginTop: 4 }}>
-          {hint}
-        </div>
-      )}
+      {hintNode}
     </div>
   )
 }

@@ -189,10 +189,10 @@ export default function DefectFormDialog({ open, mode, unitSubtree, onClose, onS
       </Field>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <Field label="בעל מקצוע">
+        <Field label="בעל מקצוע" inline>
           <ProfessionalPicker value={professional} onChange={setProfessional} style={inputStyle} />
         </Field>
-        <Field label="סטטוס">
+        <Field label="סטטוס" inline>
           <select style={inputStyle} value={status} onChange={(e) => setStatus(e.target.value)}>
             {STATUS_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
@@ -203,14 +203,14 @@ export default function DefectFormDialog({ open, mode, unitSubtree, onClose, onS
 
       {!isEdit ? (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Field label="מקור">
+          <Field label="מקור" inline>
             <select style={inputStyle} value={source} onChange={(e) => setSource(e.target.value)}>
               {SOURCE_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>{o.label}</option>
               ))}
             </select>
           </Field>
-          <Field label="תאריך פתיחה">
+          <Field label="תאריך פתיחה" inline>
             <input
               type="date"
               style={inputStyle}
@@ -220,7 +220,7 @@ export default function DefectFormDialog({ open, mode, unitSubtree, onClose, onS
           </Field>
         </div>
       ) : (
-        <Field label="תאריך סגירה" hint="ריק = פתוחה">
+        <Field label="תאריך סגירה" hint="ריק = פתוחה" inline>
           <input
             type="date"
             style={inputStyle}
@@ -228,6 +228,12 @@ export default function DefectFormDialog({ open, mode, unitSubtree, onClose, onS
             onChange={(e) => setClosedAt(e.target.value)}
           />
         </Field>
+      )}
+
+      {isEdit && mode?.kind === 'edit' && (
+        <div style={{ marginTop: 4, borderTop: '1px solid var(--color-border)', paddingTop: 12 }}>
+          <ActivityTimeline activities={mode.defect.activities} onAddActivity={onAddActivity} />
+        </div>
       )}
 
       <div style={{ marginTop: 4, borderTop: '1px solid var(--color-border)', paddingTop: 12 }}>
@@ -256,12 +262,6 @@ export default function DefectFormDialog({ open, mode, unitSubtree, onClose, onS
           </div>
         )}
       </div>
-
-      {isEdit && mode?.kind === 'edit' && (
-        <div style={{ marginTop: 4, borderTop: '1px solid var(--color-border)', paddingTop: 12 }}>
-          <ActivityTimeline activities={mode.defect.activities} onAddActivity={onAddActivity} />
-        </div>
-      )}
     </Modal>
   )
 }
