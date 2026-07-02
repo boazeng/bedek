@@ -166,8 +166,8 @@ export default function UpdateMalfunctionsPage() {
                 marginBottom: 16,
               }}
             >
-              <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--color-primary)' }}>{unit.name}</h3>
-              <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', fontSize: '0.84rem', color: 'var(--color-text-light)', marginTop: 6 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', fontSize: '0.84rem', color: 'var(--color-text-light)' }}>
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--color-primary)', margin: 0 }}>{unit.name}</h3>
                 {ancestors
                   .filter((a) => a.id !== unit.id)
                   .map((a) => (
