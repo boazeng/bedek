@@ -40,6 +40,24 @@ export const SOURCE_LABEL: Record<string, string> = {
   email: 'מייל',
 }
 
+/** Urgency levels (single source of truth — add future levels here). */
+export const URGENCY_OPTIONS: { value: string; label: string }[] = [
+  { value: 'regular', label: 'רגיל' },
+  { value: 'urgent', label: 'דחוף' },
+  { value: 'immediate', label: 'מיידי' },
+]
+
+export const URGENCY_LABEL: Record<string, string> = Object.fromEntries(
+  URGENCY_OPTIONS.map((o) => [o.value, o.label]),
+)
+
+/** Colored chip style per urgency; null = don't show a chip (e.g. "regular"). */
+export function urgencyChipStyle(u: string): React.CSSProperties | null {
+  if (u === 'urgent') return { background: '#FDEBD0', color: '#9C5700' }
+  if (u === 'immediate') return { background: '#F8D7DA', color: '#B02A37' }
+  return null
+}
+
 /** Display-only short defect number: strip the project/building/entrance
  *  segments (P#####, B##, E##) → e.g. "P00007-B01-E01-F04-7-1" → "F04-7-1". */
 export function shortDefectNumber(full: string | null): string {
@@ -123,7 +141,24 @@ export function DefectRow({
               {shownNumber}
             </code>
           )}
-          <span>{defect.description}</span>
+          <span>
+            {urgencyChipStyle(defect.urgency) && (
+              <span
+                style={{
+                  ...urgencyChipStyle(defect.urgency)!,
+                  fontSize: '0.68rem',
+                  fontWeight: 700,
+                  borderRadius: 999,
+                  padding: '1px 8px',
+                  marginInlineEnd: 6,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {URGENCY_LABEL[defect.urgency] || defect.urgency}
+              </span>
+            )}
+            {defect.description}
+          </span>
         </span>
         {compact ? (
           <span style={{ fontSize: '0.82rem', color: 'var(--color-text-light)' }}>
@@ -253,6 +288,9 @@ function DefectDetailView({
         </Field>
         <Field label="קבוצה">
           <span>{GROUP_LABEL[detail.group] || detail.group}</span>
+        </Field>
+        <Field label="דחיפות">
+          <span>{URGENCY_LABEL[detail.urgency] || detail.urgency}</span>
         </Field>
         <Field label="מקור">
           <span>{SOURCE_LABEL[detail.source] || detail.source}</span>

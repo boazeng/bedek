@@ -320,6 +320,7 @@ export type MalfunctionListRow = {
   status: string
   source: string
   group: string
+  urgency: string
   description: string
   professional: string | null
   opened_at: string
@@ -338,6 +339,7 @@ export type MalfunctionDetail = {
   status: string
   source: string
   group: string
+  urgency: string
   description: string
   professional: string | null
   assigned_to: string | null
@@ -676,6 +678,7 @@ export type MalfunctionCreatePayload = {
   status?: string
   source?: string
   group?: string
+  urgency?: string
   professional?: string | null
   opened_at?: string | null
   buyer_id?: number | null
@@ -689,6 +692,8 @@ export type MalfunctionUpdatePayload = {
   professional?: string | null
   status?: string
   group?: string
+  urgency?: string
+  location_id?: number | null
   closed_at?: string | null
   customer_signed?: boolean
   customer_signature?: string | null

@@ -25,6 +25,12 @@ class MalfunctionSource(StrEnum):
     EMAIL = "email"
 
 
+class MalfunctionUrgency(StrEnum):
+    REGULAR = "regular"      # רגיל
+    URGENT = "urgent"        # דחוף
+    IMMEDIATE = "immediate"  # מיידי
+
+
 class MalfunctionGroup(StrEnum):
     ELECTRICITY = "electricity"           # חשמל
     PLUMBING = "plumbing"                 # אינסטלציה
@@ -79,6 +85,9 @@ class Malfunction(Base):
     )
     group: Mapped[str] = mapped_column(
         String(40), default=MalfunctionGroup.UNASSIGNED, nullable=False
+    )
+    urgency: Mapped[str] = mapped_column(
+        String(40), default=MalfunctionUrgency.REGULAR, nullable=False
     )
 
     description: Mapped[str] = mapped_column(Text, nullable=False)

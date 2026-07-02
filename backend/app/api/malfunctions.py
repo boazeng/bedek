@@ -123,6 +123,7 @@ def create_defect(
         status=body.status,
         source=body.source,
         group=body.group,
+        urgency=body.urgency,
         description=body.description,
         professional=body.professional or None,
         opened_at=body.opened_at or date.today(),
@@ -202,6 +203,11 @@ def update_defect(
         d.status = body.status
     if body.group is not None:
         d.group = body.group
+    if body.urgency is not None:
+        d.urgency = body.urgency
+    # location_id: explicit presence (incl. null) means "set it" — null clears.
+    if "location_id" in body.model_fields_set:
+        d.location_id = body.location_id
     if body.closed_at is not None:
         d.closed_at = body.closed_at
     if body.customer_signed is not None:

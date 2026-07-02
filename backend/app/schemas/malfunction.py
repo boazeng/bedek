@@ -59,6 +59,7 @@ class MalfunctionListItem(BaseModel):
     status: str
     source: str
     group: str
+    urgency: str = "regular"
     description: str
     professional: str | None
     opened_at: date
@@ -81,6 +82,7 @@ class MalfunctionDetail(BaseModel):
     status: str
     source: str
     group: str
+    urgency: str = "regular"
     description: str
     professional: str | None
     assigned_to: str | None
@@ -101,6 +103,8 @@ class MalfunctionUpdate(BaseModel):
     professional: str | None = None
     status: str | None = None
     group: str | None = None
+    urgency: str | None = None
+    location_id: int | None = None   # room/location from company catalog; null clears
     closed_at: date | None = None
     customer_signed: bool | None = None
     customer_signature: str | None = None   # base64 PNG data-URL; "" clears it
@@ -118,6 +122,7 @@ class MalfunctionCreate(BaseModel):
     status: str = "pending_manager"
     source: str = "manual"
     group: str = "unassigned"
+    urgency: str = "regular"
     professional: str | None = None
     opened_at: date | None = None   # defaults to today server-side
     customer_signed: bool = False

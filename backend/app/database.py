@@ -50,6 +50,7 @@ _INPLACE_COLUMN_MIGRATIONS: list[tuple[str, str, str]] = [
     ("malfunctions", "customer_signed", "BOOLEAN NOT NULL DEFAULT FALSE"),
     ("malfunctions", "customer_signature", "TEXT"),
     ("malfunctions", "customer_signed_at", "DATE"),
+    ("malfunctions", "urgency", "VARCHAR(40) NOT NULL DEFAULT 'regular'"),
 ]
 
 

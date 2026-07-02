@@ -2,9 +2,12 @@ import { useEffect, useState } from 'react'
 import Modal, { Field, inputStyle } from './Modal'
 import ProfessionalPicker from './ProfessionalPicker'
 import SignaturePad from './SignaturePad'
-import { ActivityTimeline } from './DefectDetail'
+import { ActivityTimeline, URGENCY_OPTIONS } from './DefectDetail'
+import { useAuth, useEffectiveCompanyId } from '../lib/AuthContext'
 import {
   Malfunctions,
+  Locations,
+  type LocationRow,
   type MalfunctionDetail,
   type ProjectItemNode,
 } from '../lib/api'
@@ -55,19 +58,33 @@ function flattenDescendants(root: ProjectItemNode): ProjectItemNode[] {
 export default function DefectFormDialog({ open, mode, unitSubtree, onClose, onSaved, onError, onAddActivity }: Props) {
   const today = new Date().toISOString().slice(0, 10)
   const isEdit = mode?.kind === 'edit'
+  const { user } = useAuth()
+  const companyId = useEffectiveCompanyId()
 
   const [projectItemId, setProjectItemId] = useState<number | null>(null)
   const [description, setDescription] = useState('')
   const [status, setStatus] = useState('pending_manager')
   const [source, setSource] = useState('manual')
   const [group, setGroup] = useState('unassigned')
+  const [urgency, setUrgency] = useState('regular')
   const [professional, setProfessional] = useState('')
+  const [locationId, setLocationId] = useState<number | null>(null)
+  const [locations, setLocations] = useState<LocationRow[]>([])
   const [openedAt, setOpenedAt] = useState(today)
   const [closedAt, setClosedAt] = useState('')
   const [customerSigned, setCustomerSigned] = useState(false)
   const [signature, setSignature] = useState<string | null>(null)
   const [signedAt, setSignedAt] = useState('')
   const [saving, setSaving] = useState(false)
+
+  // Load the company's room/location catalog for the location picker.
+  useEffect(() => {
+    if (!open) return
+    const cid = user?.role === 'super_admin' ? companyId ?? undefined : undefined
+    Locations.list(cid)
+      .then(setLocations)
+      .catch(() => setLocations([]))
+  }, [open, user?.role, companyId])
 
   useEffect(() => {
     if (!open || !mode) return
@@ -78,7 +95,9 @@ export default function DefectFormDialog({ open, mode, unitSubtree, onClose, onS
       setStatus(d.status)
       setSource(d.source)
       setGroup(d.group)
+      setUrgency(d.urgency || 'regular')
       setProfessional(d.professional || '')
+      setLocationId(d.location_id)
       setOpenedAt(d.opened_at)
       setClosedAt(d.closed_at || '')
       setCustomerSigned(d.customer_signed)
@@ -90,7 +109,9 @@ export default function DefectFormDialog({ open, mode, unitSubtree, onClose, onS
       setStatus('pending_manager')
       setSource('manual')
       setGroup('unassigned')
+      setUrgency('regular')
       setProfessional('')
+      setLocationId(null)
       setOpenedAt(today)
       setClosedAt('')
       setCustomerSigned(false)
@@ -119,10 +140,12 @@ export default function DefectFormDialog({ open, mode, unitSubtree, onClose, onS
         await Malfunctions.create({
           project_id: mode.projectId,
           project_item_id: projectItemId,
+          location_id: locationId,
           description: description.trim(),
           status,
           source,
           group,
+          urgency,
           professional: professional.trim() || null,
           opened_at: openedAt || null,
           ...sigFields,
@@ -132,7 +155,9 @@ export default function DefectFormDialog({ open, mode, unitSubtree, onClose, onS
           description: description.trim(),
           status,
           group,
+          urgency,
           professional: professional.trim() || null,
+          location_id: locationId,
           closed_at: closedAt || null,
           ...sigFields,
         })
@@ -207,13 +232,33 @@ export default function DefectFormDialog({ open, mode, unitSubtree, onClose, onS
         />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <Field label="מיקום (חדר)" inline hint="קובע לאיזה חדר התקלה משויכת — לפי סיווג זה מקובצת התצוגה">
+        <select
+          style={inputStyle}
+          value={locationId ?? ''}
+          onChange={(e) => setLocationId(e.target.value ? Number(e.target.value) : null)}
+        >
+          <option value="">— ללא מיקום —</option>
+          {locations.map((l) => (
+            <option key={l.id} value={l.id}>{l.name}</option>
+          ))}
+        </select>
+      </Field>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
         <Field label="בעל מקצוע" inline>
           <ProfessionalPicker value={professional} onChange={setProfessional} style={inputStyle} />
         </Field>
         <Field label="סטטוס" inline>
           <select style={inputStyle} value={status} onChange={(e) => setStatus(e.target.value)}>
             {STATUS_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </Field>
+        <Field label="דחיפות" inline>
+          <select style={inputStyle} value={urgency} onChange={(e) => setUrgency(e.target.value)}>
+            {URGENCY_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
