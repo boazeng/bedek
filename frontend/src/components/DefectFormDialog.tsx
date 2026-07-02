@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import Modal, { Field, inputStyle } from './Modal'
 import ProfessionalPicker from './ProfessionalPicker'
+import SignaturePad from './SignaturePad'
 import {
   Malfunctions,
   type MalfunctionDetail,
@@ -60,6 +61,9 @@ export default function DefectFormDialog({ open, mode, unitSubtree, onClose, onS
   const [professional, setProfessional] = useState('')
   const [openedAt, setOpenedAt] = useState(today)
   const [closedAt, setClosedAt] = useState('')
+  const [customerSigned, setCustomerSigned] = useState(false)
+  const [signature, setSignature] = useState<string | null>(null)
+  const [signedAt, setSignedAt] = useState('')
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -74,6 +78,9 @@ export default function DefectFormDialog({ open, mode, unitSubtree, onClose, onS
       setProfessional(d.professional || '')
       setOpenedAt(d.opened_at)
       setClosedAt(d.closed_at || '')
+      setCustomerSigned(d.customer_signed)
+      setSignature(d.customer_signature)
+      setSignedAt(d.customer_signed_at || '')
     } else {
       setProjectItemId(mode.unitId)  // default to the unit itself
       setDescription('')
@@ -83,6 +90,9 @@ export default function DefectFormDialog({ open, mode, unitSubtree, onClose, onS
       setProfessional('')
       setOpenedAt(today)
       setClosedAt('')
+      setCustomerSigned(false)
+      setSignature(null)
+      setSignedAt('')
     }
   }, [open, mode])
 
@@ -93,6 +103,12 @@ export default function DefectFormDialog({ open, mode, unitSubtree, onClose, onS
     if (!description.trim()) {
       onError('יש להזין תיאור תקלה')
       return
+    }
+    // Signature fields: only meaningful when the customer signed.
+    const sigFields = {
+      customer_signed: customerSigned,
+      customer_signature: customerSigned ? signature : null,
+      customer_signed_at: customerSigned ? signedAt || today : null,
     }
     setSaving(true)
     try {
@@ -106,6 +122,7 @@ export default function DefectFormDialog({ open, mode, unitSubtree, onClose, onS
           group,
           professional: professional.trim() || null,
           opened_at: openedAt || null,
+          ...sigFields,
         })
       } else {
         await Malfunctions.update(mode.defect.id, {
@@ -114,6 +131,7 @@ export default function DefectFormDialog({ open, mode, unitSubtree, onClose, onS
           group,
           professional: professional.trim() || null,
           closed_at: closedAt || null,
+          ...sigFields,
         })
       }
       onSaved()
@@ -207,6 +225,33 @@ export default function DefectFormDialog({ open, mode, unitSubtree, onClose, onS
           />
         </Field>
       )}
+
+      <div style={{ marginTop: 4, borderTop: '1px solid var(--color-border)', paddingTop: 12 }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem', cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={customerSigned}
+            onChange={(e) => setCustomerSigned(e.target.checked)}
+          />
+          האם נחתם לקוח
+        </label>
+
+        {customerSigned && (
+          <div style={{ marginTop: 12 }}>
+            <Field label="תאריך חתימה">
+              <input
+                type="date"
+                style={inputStyle}
+                value={signedAt || today}
+                onChange={(e) => setSignedAt(e.target.value)}
+              />
+            </Field>
+            <Field label="חתימת לקוח">
+              <SignaturePad value={signature} onChange={setSignature} />
+            </Field>
+          </div>
+        )}
+      </div>
     </Modal>
   )
 }

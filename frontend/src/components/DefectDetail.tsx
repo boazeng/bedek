@@ -299,6 +299,38 @@ function DefectDetailView({
       <div style={{ marginTop: 18 }}>
         <AttachmentsPanel target={{ malfunctionId: detail.id }} canWrite={canWrite} />
       </div>
+
+      <div style={{ marginTop: 18 }}>
+        <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--color-primary)', marginBottom: 8 }}>
+          חתימת לקוח
+        </div>
+        {detail.customer_signed ? (
+          <div>
+            <div style={{ fontSize: '0.82rem', color: 'var(--color-pos)', marginBottom: 6 }}>
+              ✓ נחתם
+              {detail.customer_signed_at && (
+                <span style={{ color: 'var(--color-text-light)' }}>
+                  {' '}· {new Date(detail.customer_signed_at).toLocaleDateString('he-IL')}
+                </span>
+              )}
+            </div>
+            {detail.customer_signature && (
+              <img
+                src={detail.customer_signature}
+                alt="חתימת לקוח"
+                style={{
+                  maxWidth: 280,
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 8,
+                  background: 'var(--color-bg-white)',
+                }}
+              />
+            )}
+          </div>
+        ) : (
+          <div style={{ fontSize: '0.82rem', color: 'var(--color-text-light)' }}>טרם נחתם</div>
+        )}
+      </div>
     </div>
   )
 }
