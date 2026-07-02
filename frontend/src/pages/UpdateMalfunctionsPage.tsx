@@ -127,6 +127,29 @@ export default function UpdateMalfunctionsPage() {
     setDetails((prev) => new Map(prev).set(defectId, fresh))
   }
 
+  async function expandAll() {
+    const ids = defects.map((d) => d.id)
+    setExpanded(new Set(ids))
+    const missing = ids.filter((id) => !details.has(id))
+    if (!missing.length) return
+    const fetched = await Promise.all(
+      missing.map((id) =>
+        Malfunctions.get(id)
+          .then((d) => [id, d] as const)
+          .catch(() => null),
+      ),
+    )
+    setDetails((prev) => {
+      const next = new Map(prev)
+      for (const r of fetched) if (r) next.set(r[0], r[1])
+      return next
+    })
+  }
+
+  function collapseAll() {
+    setExpanded(new Set())
+  }
+
   const groups = useMemo(() => groupDefects(defects, groupBy), [defects, groupBy])
 
   // No unit chosen in the top bar → prompt the user to pick one.
@@ -212,6 +235,24 @@ export default function UpdateMalfunctionsPage() {
                 מקצועות
               </button>
             </div>
+            <button
+              onClick={expandAll}
+              className="tact-btn tact-btn-ghost"
+              title="הרחב הכל"
+              disabled={defects.length === 0}
+              style={{ padding: 0, width: 30, height: 30, fontSize: '1.1rem', lineHeight: 1 }}
+            >
+              +
+            </button>
+            <button
+              onClick={collapseAll}
+              className="tact-btn tact-btn-ghost"
+              title="כווץ הכל"
+              disabled={expanded.size === 0}
+              style={{ padding: 0, width: 30, height: 30, fontSize: '1.1rem', lineHeight: 1 }}
+            >
+              −
+            </button>
             <span style={{ fontSize: '0.82rem', color: 'var(--color-text-light)' }}>{defects.length} תקלות</span>
             <span style={{ flex: 1 }} />
             {canWrite && (
