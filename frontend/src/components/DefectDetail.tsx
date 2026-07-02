@@ -39,13 +39,27 @@ export const SOURCE_LABEL: Record<string, string> = {
   email: 'מייל',
 }
 
+/** Display-only short defect number: strip the project/building/entrance
+ *  segments (P#####, B##, E##) → e.g. "P00007-B01-E01-F04-7-1" → "F04-7-1". */
+export function shortDefectNumber(full: string | null): string {
+  if (!full) return ''
+  const parts = full.split('-')
+  let i = 0
+  while (i < parts.length && /^[PBE]\d+$/i.test(parts[i])) i++
+  const rest = parts.slice(i)
+  return rest.length ? rest.join('-') : full
+}
+
 /** One collapsible defect row + its expanded full-detail view (fields, activity
- *  timeline, attachments). Shared by the unit-defects and update-defects pages. */
+ *  timeline, attachments). Shared by the unit-defects and update-defects pages.
+ *  `compact` renders the update-defects column set: short number · description ·
+ *  professional · status · opened-at (no entity/group columns). */
 export function DefectRow({
   defect,
   expanded,
   detail,
   canWrite,
+  compact = false,
   onToggle,
   onEdit,
   onAddActivity,
@@ -54,10 +68,12 @@ export function DefectRow({
   expanded: boolean
   detail: MalfunctionDetail | undefined
   canWrite: boolean
+  compact?: boolean
   onToggle: () => void
   onEdit: () => void
   onAddActivity: () => void
 }) {
+  const shownNumber = compact ? shortDefectNumber(defect.number) : defect.number
   return (
     <div style={{ borderBottom: '1px solid var(--color-border)' }}>
       <button
@@ -68,7 +84,7 @@ export function DefectRow({
           border: 'none',
           padding: '12px 16px',
           display: 'grid',
-          gridTemplateColumns: '24px 1fr 110px 100px 100px 110px',
+          gridTemplateColumns: compact ? '24px 1fr 140px 110px 110px' : '24px 1fr 110px 100px 100px 110px',
           gap: 10,
           alignItems: 'center',
           cursor: 'pointer',
@@ -80,22 +96,30 @@ export function DefectRow({
           {expanded ? '▼' : '◀'}
         </span>
         <span style={{ fontWeight: 500, fontSize: '0.95rem', display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {defect.number && (
+          {shownNumber && (
             <code style={{ fontFamily: 'var(--font-family-en)', fontSize: '0.72rem', color: 'var(--color-primary)' }}>
-              {defect.number}
+              {shownNumber}
             </code>
           )}
           <span>{defect.description}</span>
         </span>
-        <span style={{ fontSize: '0.82rem', color: 'var(--color-text-light)' }}>
-          {defect.project_item_name || '—'}
-        </span>
+        {compact ? (
+          <span style={{ fontSize: '0.82rem', color: 'var(--color-text-light)' }}>
+            {defect.professional || '—'}
+          </span>
+        ) : (
+          <span style={{ fontSize: '0.82rem', color: 'var(--color-text-light)' }}>
+            {defect.project_item_name || '—'}
+          </span>
+        )}
         <span className={`tact-badge ${STATUS_CLASS[defect.status] || ''}`}>
           {STATUS_LABEL[defect.status] || defect.status}
         </span>
-        <span style={{ fontSize: '0.82rem', color: 'var(--color-text-light)' }}>
-          {GROUP_LABEL[defect.group] || defect.group}
-        </span>
+        {!compact && (
+          <span style={{ fontSize: '0.82rem', color: 'var(--color-text-light)' }}>
+            {GROUP_LABEL[defect.group] || defect.group}
+          </span>
+        )}
         <span style={{ fontSize: '0.78rem', color: 'var(--color-text-light)' }}>
           {new Date(defect.opened_at).toLocaleDateString('he-IL')}
         </span>

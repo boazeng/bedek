@@ -263,6 +263,7 @@ export default function UpdateMalfunctionsPage() {
                       expanded={expanded.has(d.id)}
                       detail={details.get(d.id)}
                       canWrite={canWrite}
+                      compact
                       onToggle={() => toggle(d.id)}
                       onEdit={() => {
                         const det = details.get(d.id)
