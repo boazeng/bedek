@@ -1,17 +1,16 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
-  CompanyProfessionals,
   Locations,
   Malfunctions,
   Projects,
   ProjectTree,
-  type CompanyProfessionalRow,
   type LocationRow,
   type Project,
   type ProjectItemNode,
 } from '../lib/api'
 import { useAuth, useEffectiveCompanyId } from '../lib/AuthContext'
 import { useAlert } from '../components/Dialog'
+import ProfessionalPicker from '../components/ProfessionalPicker'
 
 // Prominent green label, scoped to the "open malfunction" form so the
 // shared Field/inputStyle used by other admin screens stays untouched.
@@ -101,7 +100,6 @@ export default function OpenMalfunctionPage() {
   const [unitId, setUnitId] = useState<number | null>(null)
   const [locationId, setLocationId] = useState<number | null>(null)
   const [locations, setLocations] = useState<LocationRow[]>([])
-  const [trades, setTrades] = useState<CompanyProfessionalRow[]>([])
   const [description, setDescription] = useState('')
   const [status, setStatus] = useState('pending_manager')
   const [source, setSource] = useState('manual')
@@ -136,9 +134,6 @@ export default function OpenMalfunctionPage() {
     Locations.list(cid)
       .then(setLocations)
       .catch(() => setLocations([]))
-    CompanyProfessionals.list(cid)
-      .then((rows) => setTrades(rows.filter((r) => r.is_active)))
-      .catch(() => setTrades([]))
   }, [user?.role, companyId])
 
   useEffect(() => {
@@ -367,19 +362,12 @@ export default function OpenMalfunctionPage() {
         </Field>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Field label="מקצוע" hint="מתוך סיווגי בעלי המקצוע של החברה (ניהול חברה ← סיווגי בעלי מקצוע)">
-            <select
-              style={strongInputStyle}
+          <Field label="מקצוע" hint="מתוך סיווגי בעלי המקצוע של החברה, או הוסף חדש">
+            <ProfessionalPicker
               value={professional}
-              onChange={(e) => setProfessional(e.target.value)}
-            >
-              <option value="">— בחר מקצוע —</option>
-              {trades.map((t) => (
-                <option key={t.id} value={t.name}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
+              onChange={setProfessional}
+              style={strongInputStyle}
+            />
           </Field>
           <Field label="מיקום">
             <select

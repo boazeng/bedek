@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import Modal, { Field, inputStyle } from './Modal'
+import ProfessionalPicker from './ProfessionalPicker'
 import {
   Malfunctions,
   type MalfunctionDetail,
@@ -167,12 +168,7 @@ export default function DefectFormDialog({ open, mode, unitSubtree, onClose, onS
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <Field label="בעל מקצוע">
-          <input
-            style={inputStyle}
-            value={professional}
-            onChange={(e) => setProfessional(e.target.value)}
-            placeholder="חשמלאי / אינסטלטור / ..."
-          />
+          <ProfessionalPicker value={professional} onChange={setProfessional} style={inputStyle} />
         </Field>
         <Field label="סטטוס">
           <select style={inputStyle} value={status} onChange={(e) => setStatus(e.target.value)}>
