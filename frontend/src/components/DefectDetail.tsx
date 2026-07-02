@@ -149,7 +149,7 @@ export function DefectRow({
                   </button>
                 </div>
               )}
-              <DefectDetailView detail={detail} canWrite={canWrite} />
+              <DefectDetailView detail={detail} canWrite={canWrite} compact={compact} />
             </>
           )}
         </div>
@@ -158,9 +158,18 @@ export function DefectRow({
   )
 }
 
-function DefectDetailView({ detail, canWrite }: { detail: MalfunctionDetail; canWrite: boolean }) {
+function DefectDetailView({
+  detail,
+  canWrite,
+  compact = false,
+}: {
+  detail: MalfunctionDetail
+  canWrite: boolean
+  compact?: boolean
+}) {
   return (
     <div>
+      {!compact && (
       <div
         style={{
           display: 'grid',
@@ -200,12 +209,15 @@ function DefectDetailView({ detail, canWrite }: { detail: MalfunctionDetail; can
           <span>{detail.closed_at ? new Date(detail.closed_at).toLocaleDateString('he-IL') : <em style={{ color: 'var(--color-text-light)' }}>פתוחה</em>}</span>
         </Field>
       </div>
+      )}
 
-      <Field label="תיאור התקלה">
-        <div style={{ whiteSpace: 'pre-wrap' }}>{detail.description}</div>
-      </Field>
+      {!compact && (
+        <Field label="תיאור התקלה">
+          <div style={{ whiteSpace: 'pre-wrap' }}>{detail.description}</div>
+        </Field>
+      )}
 
-      <div style={{ marginTop: 18 }}>
+      <div style={{ marginTop: compact ? 0 : 18 }}>
         <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--color-primary)', marginBottom: 8 }}>
           יומן פעילויות ({detail.activities.length})
         </div>

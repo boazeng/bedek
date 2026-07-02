@@ -180,30 +180,71 @@ export default function AppShell({ current, onNavigate, children }: Props) {
 
         {mainItems.map(renderNavButton)}
 
-        <div style={{ marginTop: 'auto', borderTop: '1px solid var(--color-border)', paddingTop: 14 }}>
-          <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{user?.full_name}</div>
-          <div style={{ fontSize: '0.75rem', color: 'var(--color-text-light)', marginBottom: 4 }}>
-            {ROLE_LABEL[user?.role || '']}
-          </div>
-          {user?.company_name && (
-            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-light)', marginBottom: 10 }}>
-              {user.company_name}
-            </div>
-          )}
-
-          {bottomItems.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
-              {bottomItems.map(renderNavButton)}
-            </div>
-          )}
+        <div style={{ marginTop: 'auto', borderTop: '1px solid var(--color-border)', paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {bottomItems.map(renderNavButton)}
 
           <button
             onClick={logout}
-            className="tact-btn tact-btn-ghost"
-            style={{ width: '100%', padding: '8px 12px', fontSize: '0.85rem' }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              padding: '10px 12px',
+              borderRadius: 10,
+              border: '1px solid transparent',
+              background: 'transparent',
+              color: 'var(--color-text)',
+              fontWeight: 500,
+              fontSize: '0.92rem',
+              cursor: 'pointer',
+              textAlign: 'start',
+              transition: 'background .15s, color .15s',
+              font: 'inherit',
+              width: '100%',
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background = 'rgba(31,58,95,0.08)'
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
+            }}
           >
+            <TactIcon name="logout" size={18} />
             יציאה
           </button>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8, padding: '4px 8px' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--color-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {user?.full_name}
+              </div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--color-text-light)' }}>
+                {ROLE_LABEL[user?.role || '']}
+              </div>
+              {user?.company_name && (
+                <div style={{ fontSize: '0.75rem', color: 'var(--color-text-light)' }}>
+                  {user.company_name}
+                </div>
+              )}
+            </div>
+            <div
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: '50%',
+                background: 'var(--color-primary)',
+                color: 'var(--color-text-white)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 700,
+                fontSize: '1rem',
+                flexShrink: 0,
+              }}
+            >
+              {user?.full_name?.trim().charAt(0) || '?'}
+            </div>
+          </div>
         </div>
       </aside>
 
