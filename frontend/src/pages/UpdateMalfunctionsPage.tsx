@@ -343,6 +343,9 @@ export default function UpdateMalfunctionsPage() {
           if (wasEditingId) refreshDetail(wasEditingId).catch(() => {})
         }}
         onError={(msg) => alert({ title: 'שגיאה', message: msg, variant: 'danger' })}
+        onAddActivity={() => {
+          if (editingDefect) setActivityFormOpenFor(editingDefect.id)
+        }}
       />
 
       <ActivityFormDialog
@@ -355,7 +358,16 @@ export default function UpdateMalfunctionsPage() {
         onSaved={() => {
           const id = activityFormOpenFor
           setActivityFormOpenFor(null)
-          if (id !== null) refreshDetail(id).catch(() => {})
+          if (id !== null) {
+            // Refresh the row detail and, if this defect is open in the edit
+            // dialog, update it too so the activity log reflects the addition.
+            Malfunctions.get(id)
+              .then((fresh) => {
+                setDetails((prev) => new Map(prev).set(id, fresh))
+                setEditingDefect((cur) => (cur && cur.id === id ? fresh : cur))
+              })
+              .catch(() => {})
+          }
         }}
         onError={(msg) => alert({ title: 'שגיאה', message: msg, variant: 'danger' })}
       />

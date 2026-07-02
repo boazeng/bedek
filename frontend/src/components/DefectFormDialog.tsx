@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import Modal, { Field, inputStyle } from './Modal'
 import ProfessionalPicker from './ProfessionalPicker'
 import SignaturePad from './SignaturePad'
+import { ActivityTimeline } from './DefectDetail'
 import {
   Malfunctions,
   type MalfunctionDetail,
@@ -19,6 +20,8 @@ type Props = {
   onClose: () => void
   onSaved: () => void
   onError: (msg: string) => void
+  /** Open the "add activity" dialog for the defect being edited (edit mode only). */
+  onAddActivity?: () => void
 }
 
 const STATUS_OPTIONS = [
@@ -49,7 +52,7 @@ function flattenDescendants(root: ProjectItemNode): ProjectItemNode[] {
   return out
 }
 
-export default function DefectFormDialog({ open, mode, unitSubtree, onClose, onSaved, onError }: Props) {
+export default function DefectFormDialog({ open, mode, unitSubtree, onClose, onSaved, onError, onAddActivity }: Props) {
   const today = new Date().toISOString().slice(0, 10)
   const isEdit = mode?.kind === 'edit'
 
@@ -148,6 +151,7 @@ export default function DefectFormDialog({ open, mode, unitSubtree, onClose, onS
       title={isEdit ? 'עריכת תקלה' : 'תקלה חדשה'}
       onClose={onClose}
       width={600}
+      dense
       footer={
         <>
           <button className="tact-btn tact-btn-ghost" onClick={onClose}>
@@ -177,7 +181,7 @@ export default function DefectFormDialog({ open, mode, unitSubtree, onClose, onS
 
       <Field label="תיאור התקלה">
         <textarea
-          style={{ ...inputStyle, minHeight: 70, resize: 'vertical' }}
+          style={{ ...inputStyle, minHeight: 52, resize: 'vertical' }}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder='למשל: "סדק בקיר הסלון", "ברז דולף במטבח"'
@@ -252,6 +256,12 @@ export default function DefectFormDialog({ open, mode, unitSubtree, onClose, onS
           </div>
         )}
       </div>
+
+      {isEdit && mode?.kind === 'edit' && (
+        <div style={{ marginTop: 4, borderTop: '1px solid var(--color-border)', paddingTop: 12 }}>
+          <ActivityTimeline activities={mode.defect.activities} onAddActivity={onAddActivity} />
+        </div>
+      )}
     </Modal>
   )
 }

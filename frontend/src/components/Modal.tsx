@@ -7,10 +7,15 @@ type Props = {
   children: ReactNode
   footer?: ReactNode
   width?: number
+  /** Tighter paddings — for form-heavy dialogs that need to fit more on screen. */
+  dense?: boolean
 }
 
-export default function Modal({ open, title, onClose, children, footer, width = 540 }: Props) {
+export default function Modal({ open, title, onClose, children, footer, width = 540, dense = false }: Props) {
   if (!open) return null
+  const headPad = dense ? '12px 18px' : '16px 22px'
+  const bodyPad = dense ? '14px 18px' : 22
+  const footPad = dense ? '12px 18px' : '14px 22px'
   return (
     <div
       onClick={onClose}
@@ -41,7 +46,7 @@ export default function Modal({ open, title, onClose, children, footer, width = 
       >
         <div
           style={{
-            padding: '16px 22px',
+            padding: headPad,
             borderBottom: '1px solid var(--color-border)',
             display: 'flex',
             justifyContent: 'space-between',
@@ -66,11 +71,11 @@ export default function Modal({ open, title, onClose, children, footer, width = 
             ×
           </button>
         </div>
-        <div style={{ padding: 22, overflowY: 'auto' }}>{children}</div>
+        <div style={{ padding: bodyPad, overflowY: 'auto' }}>{children}</div>
         {footer && (
           <div
             style={{
-              padding: '14px 22px',
+              padding: footPad,
               borderTop: '1px solid var(--color-border)',
               display: 'flex',
               gap: 8,

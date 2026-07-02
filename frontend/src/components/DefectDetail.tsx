@@ -256,44 +256,7 @@ function DefectDetailView({
       )}
 
       <div style={{ marginTop: compact ? 0 : 18 }}>
-        <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--color-primary)', marginBottom: 8 }}>
-          יומן פעילויות ({detail.activities.length})
-        </div>
-        {detail.activities.length === 0 ? (
-          <div style={{ fontSize: '0.82rem', color: 'var(--color-text-light)' }}>
-            עדיין לא תועדו פעילויות
-          </div>
-        ) : (
-          <ol
-            style={{
-              listStyle: 'none',
-              padding: 0,
-              margin: 0,
-              borderInlineStart: '2px solid var(--color-primary-soft)',
-              paddingInlineStart: 14,
-            }}
-          >
-            {detail.activities.map((a) => (
-              <li key={a.id} style={{ padding: '8px 0' }}>
-                <div style={{ display: 'flex', gap: 10, alignItems: 'baseline' }}>
-                  {a.number && (
-                    <code style={{ fontFamily: 'var(--font-family-en)', fontSize: '0.74rem', color: 'var(--color-primary)', fontWeight: 700 }}>
-                      {a.number}
-                    </code>
-                  )}
-                  <span style={{ fontFamily: 'var(--font-family-en)', fontSize: '0.78rem', color: 'var(--color-text-light)', minWidth: 90 }}>
-                    {new Date(a.occurred_on).toLocaleDateString('he-IL')}
-                  </span>
-                  <strong style={{ fontSize: '0.9rem', whiteSpace: 'pre-wrap' }}>{a.action}</strong>
-                  {a.performed_by && (
-                    <span style={{ fontSize: '0.78rem', color: 'var(--color-text-light)' }}>· {a.performed_by}</span>
-                  )}
-                </div>
-                {a.notes && <div style={{ fontSize: '0.82rem', color: 'var(--color-text-light)', marginTop: 2, marginInlineStart: 100 }}>{a.notes}</div>}
-              </li>
-            ))}
-          </ol>
-        )}
+        <ActivityTimeline activities={detail.activities} />
       </div>
 
       <div style={{ marginTop: 18 }}>
@@ -331,6 +294,72 @@ function DefectDetailView({
           <div style={{ fontSize: '0.82rem', color: 'var(--color-text-light)' }}>טרם נחתם</div>
         )}
       </div>
+    </div>
+  )
+}
+
+/** Activity log (יומן פעילויות): timeline of a defect's activities, with an
+ *  optional "add activity" button in the header. Shared by the expanded row
+ *  detail and the edit-defect dialog. */
+export function ActivityTimeline({
+  activities,
+  onAddActivity,
+}: {
+  activities: MalfunctionDetail['activities']
+  onAddActivity?: () => void
+}) {
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+        <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--color-primary)' }}>
+          יומן פעילויות ({activities.length})
+        </div>
+        {onAddActivity && (
+          <button
+            type="button"
+            onClick={onAddActivity}
+            className="tact-btn tact-btn-ghost"
+            style={{ padding: '4px 10px', fontSize: '0.76rem' }}
+          >
+            + פעילות חדשה
+          </button>
+        )}
+      </div>
+      {activities.length === 0 ? (
+        <div style={{ fontSize: '0.82rem', color: 'var(--color-text-light)' }}>
+          עדיין לא תועדו פעילויות
+        </div>
+      ) : (
+        <ol
+          style={{
+            listStyle: 'none',
+            padding: 0,
+            margin: 0,
+            borderInlineStart: '2px solid var(--color-primary-soft)',
+            paddingInlineStart: 14,
+          }}
+        >
+          {activities.map((a) => (
+            <li key={a.id} style={{ padding: '8px 0' }}>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'baseline' }}>
+                {a.number && (
+                  <code style={{ fontFamily: 'var(--font-family-en)', fontSize: '0.74rem', color: 'var(--color-primary)', fontWeight: 700 }}>
+                    {a.number}
+                  </code>
+                )}
+                <span style={{ fontFamily: 'var(--font-family-en)', fontSize: '0.78rem', color: 'var(--color-text-light)', minWidth: 90 }}>
+                  {new Date(a.occurred_on).toLocaleDateString('he-IL')}
+                </span>
+                <strong style={{ fontSize: '0.9rem', whiteSpace: 'pre-wrap' }}>{a.action}</strong>
+                {a.performed_by && (
+                  <span style={{ fontSize: '0.78rem', color: 'var(--color-text-light)' }}>· {a.performed_by}</span>
+                )}
+              </div>
+              {a.notes && <div style={{ fontSize: '0.82rem', color: 'var(--color-text-light)', marginTop: 2, marginInlineStart: 100 }}>{a.notes}</div>}
+            </li>
+          ))}
+        </ol>
+      )}
     </div>
   )
 }
