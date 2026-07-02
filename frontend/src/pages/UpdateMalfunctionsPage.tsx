@@ -72,7 +72,16 @@ function groupDefects(defects: MalfunctionListRow[], by: GroupBy): DefectGroup[]
     })
 }
 
-const labelTextStyle: React.CSSProperties = { marginBottom: 4, color: 'var(--color-text-light)' }
+const inlineFieldStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  fontSize: '0.85rem',
+}
+const inlineLabelStyle: React.CSSProperties = {
+  color: 'var(--color-text-light)',
+  whiteSpace: 'nowrap',
+}
 
 export default function UpdateMalfunctionsPage() {
   const { user, activeProject, workScope } = useAuth()
@@ -194,20 +203,13 @@ export default function UpdateMalfunctionsPage() {
 
   return (
     <div>
-      <div style={{ marginBottom: 16 }}>
-        <h2 style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--color-primary)' }}>עידכון תקלות</h2>
-        <div style={{ fontSize: '0.85rem', color: 'var(--color-text-light)' }}>
-          בחר יחידה כדי לצפות ולעדכן את התקלות שלה — לפי מיקומים או לפי מקצועות
-        </div>
-      </div>
-
-      {/* Unit picker */}
+      {/* Unit picker — labels inline with their fields */}
       <div
         style={{
           display: 'flex',
-          gap: 10,
+          gap: 16,
           marginBottom: 14,
-          alignItems: 'flex-end',
+          alignItems: 'center',
           flexWrap: 'wrap',
           background: 'var(--color-bg-white)',
           border: '1px solid var(--color-border)',
@@ -215,8 +217,8 @@ export default function UpdateMalfunctionsPage() {
           padding: '12px 14px',
         }}
       >
-        <label style={{ fontSize: '0.8rem' }}>
-          <div style={labelTextStyle}>פרויקט</div>
+        <label style={inlineFieldStyle}>
+          <span style={inlineLabelStyle}>פרויקט</span>
           <select
             value={projectId ?? ''}
             onChange={(e) => {
@@ -234,8 +236,8 @@ export default function UpdateMalfunctionsPage() {
           </select>
         </label>
 
-        <label style={{ fontSize: '0.8rem' }}>
-          <div style={labelTextStyle}>בניין</div>
+        <label style={inlineFieldStyle}>
+          <span style={inlineLabelStyle}>בניין</span>
           <select
             value={filter.buildingId ?? ''}
             onChange={(e) =>
@@ -256,8 +258,8 @@ export default function UpdateMalfunctionsPage() {
           </select>
         </label>
 
-        <label style={{ fontSize: '0.8rem' }}>
-          <div style={labelTextStyle}>כניסה</div>
+        <label style={inlineFieldStyle}>
+          <span style={inlineLabelStyle}>כניסה</span>
           <select
             value={filter.entranceId ?? ''}
             disabled={!filter.buildingId}
@@ -279,8 +281,8 @@ export default function UpdateMalfunctionsPage() {
           </select>
         </label>
 
-        <label style={{ fontSize: '0.8rem' }}>
-          <div style={labelTextStyle}>יחידה</div>
+        <label style={inlineFieldStyle}>
+          <span style={inlineLabelStyle}>יחידה</span>
           <select
             value={filter.unitId ?? ''}
             disabled={!filter.entranceId}
