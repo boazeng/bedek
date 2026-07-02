@@ -37,17 +37,6 @@ const SOURCE_OPTIONS = [
   { value: 'email', label: 'מייל' },
 ]
 
-const GROUP_OPTIONS = [
-  { value: 'unassigned', label: 'טרם נבחר' },
-  { value: 'electricity', label: 'חשמל' },
-  { value: 'plumbing', label: 'אינסטלציה' },
-  { value: 'finishes', label: 'גמרים' },
-  { value: 'structure', label: 'שלד' },
-  { value: 'protection', label: 'מיגון' },
-  { value: 'sealing', label: 'איטום' },
-  { value: 'aluminum', label: 'אלומיניום' },
-]
-
 function flattenDescendants(root: ProjectItemNode): ProjectItemNode[] {
   const out: ProjectItemNode[] = []
   function walk(n: ProjectItemNode) {
@@ -177,12 +166,13 @@ export default function DefectFormDialog({ open, mode, unitSubtree, onClose, onS
       </Field>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <Field label="קבוצה">
-          <select style={inputStyle} value={group} onChange={(e) => setGroup(e.target.value)}>
-            {GROUP_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
+        <Field label="בעל מקצוע">
+          <input
+            style={inputStyle}
+            value={professional}
+            onChange={(e) => setProfessional(e.target.value)}
+            placeholder="חשמלאי / אינסטלטור / ..."
+          />
         </Field>
         <Field label="סטטוס">
           <select style={inputStyle} value={status} onChange={(e) => setStatus(e.target.value)}>
@@ -193,16 +183,8 @@ export default function DefectFormDialog({ open, mode, unitSubtree, onClose, onS
         </Field>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <Field label="בעל מקצוע">
-          <input
-            style={inputStyle}
-            value={professional}
-            onChange={(e) => setProfessional(e.target.value)}
-            placeholder="חשמלאי / אינסטלטור / ..."
-          />
-        </Field>
-        {!isEdit ? (
+      {!isEdit ? (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <Field label="מקור">
             <select style={inputStyle} value={source} onChange={(e) => setSource(e.target.value)}>
               {SOURCE_OPTIONS.map((o) => (
@@ -210,25 +192,22 @@ export default function DefectFormDialog({ open, mode, unitSubtree, onClose, onS
               ))}
             </select>
           </Field>
-        ) : (
-          <Field label="תאריך סגירה" hint="ריק = פתוחה">
+          <Field label="תאריך פתיחה">
             <input
               type="date"
               style={inputStyle}
-              value={closedAt}
-              onChange={(e) => setClosedAt(e.target.value)}
+              value={openedAt}
+              onChange={(e) => setOpenedAt(e.target.value)}
             />
           </Field>
-        )}
-      </div>
-
-      {!isEdit && (
-        <Field label="תאריך פתיחה">
+        </div>
+      ) : (
+        <Field label="תאריך סגירה" hint="ריק = פתוחה">
           <input
             type="date"
             style={inputStyle}
-            value={openedAt}
-            onChange={(e) => setOpenedAt(e.target.value)}
+            value={closedAt}
+            onChange={(e) => setClosedAt(e.target.value)}
           />
         </Field>
       )}
