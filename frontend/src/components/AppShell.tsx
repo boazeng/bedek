@@ -214,19 +214,6 @@ export default function AppShell({ current, onNavigate, children }: Props) {
           </button>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8, padding: '4px 8px' }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--color-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {user?.full_name}
-              </div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--color-text-light)' }}>
-                {ROLE_LABEL[user?.role || '']}
-              </div>
-              {user?.company_name && (
-                <div style={{ fontSize: '0.75rem', color: 'var(--color-text-light)' }}>
-                  {user.company_name}
-                </div>
-              )}
-            </div>
             <div
               style={{
                 width: 40,
@@ -243,6 +230,19 @@ export default function AppShell({ current, onNavigate, children }: Props) {
               }}
             >
               {user?.full_name?.trim().charAt(0) || '?'}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--color-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {user?.full_name}
+              </div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--color-text-light)' }}>
+                {ROLE_LABEL[user?.role || '']}
+              </div>
+              {user?.company_name && (
+                <div style={{ fontSize: '0.75rem', color: 'var(--color-text-light)' }}>
+                  {user.company_name}
+                </div>
+              )}
             </div>
           </div>
         </div>
