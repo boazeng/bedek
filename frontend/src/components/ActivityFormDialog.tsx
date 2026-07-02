@@ -1,6 +1,16 @@
 import { useEffect, useState } from 'react'
 import Modal, { Field, inputStyle } from './Modal'
+import ProfessionalPicker from './ProfessionalPicker'
+import AttachmentsPanel from './AttachmentsPanel'
 import { Malfunctions } from '../lib/api'
+
+/** Emphasized input: white background + steel-blue outline, so form fields
+ *  stand out clearly against the dialog. */
+const emphInput: React.CSSProperties = {
+  ...inputStyle,
+  background: 'var(--color-bg-white)',
+  border: '1.5px solid var(--color-primary-light)',
+}
 
 type Props = {
   open: boolean
@@ -77,33 +87,34 @@ export default function ActivityFormDialog({
       <Field label="תאריך הפעילות">
         <input
           type="date"
-          style={inputStyle}
+          style={emphInput}
           value={occurredOn}
           onChange={(e) => setOccurredOn(e.target.value)}
         />
       </Field>
       <Field label="פעילות" hint='למשל "ביקור אבחון", "צבע יד שנייה", "בדיקה סופית". ניתן לכתוב בכמה שורות.'>
         <textarea
-          style={{ ...inputStyle, minHeight: 80, resize: 'vertical' }}
+          style={{ ...emphInput, minHeight: 80, resize: 'vertical' }}
           value={action}
           onChange={(e) => setAction(e.target.value)}
         />
       </Field>
-      <Field label="מבצע">
-        <input
-          style={inputStyle}
-          value={performedBy}
-          onChange={(e) => setPerformedBy(e.target.value)}
-          placeholder="שם בעל המקצוע / האחראי"
-        />
+      <Field label="בעל מקצוע">
+        <ProfessionalPicker value={performedBy} onChange={setPerformedBy} style={emphInput} />
       </Field>
       <Field label="הערות">
         <textarea
-          style={{ ...inputStyle, minHeight: 60, resize: 'vertical' }}
+          style={{ ...emphInput, minHeight: 60, resize: 'vertical' }}
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
         />
       </Field>
+
+      {defectId !== null && (
+        <div style={{ marginTop: 4, borderTop: '1px solid var(--color-border)', paddingTop: 12 }}>
+          <AttachmentsPanel target={{ malfunctionId: defectId }} title="קבצים מצורפים" />
+        </div>
+      )}
     </Modal>
   )
 }

@@ -51,6 +51,18 @@ export function shortDefectNumber(full: string | null): string {
   return rest.length ? rest.join('-') : full
 }
 
+/** Display-only short activity number: unit · defect · activity, dotted.
+ *  The backend number is "<unit-code>-<defectSeq>.<activitySeq>"
+ *  (e.g. "P00007-B01-E01-F04-7-1.1") → "7.1.1" (apartment.defect.activity). */
+export function shortActivityNumber(full: string | null): string {
+  if (!full) return ''
+  const [defectPart, actSeq] = full.split('.')
+  const segs = defectPart.split('-')
+  const apartment = segs.length >= 2 ? segs[segs.length - 2] : segs[0]
+  const defectSeq = segs[segs.length - 1]
+  return actSeq ? `${apartment}.${defectSeq}.${actSeq}` : `${apartment}.${defectSeq}`
+}
+
 /** One collapsible defect row + its expanded full-detail view (fields, activity
  *  timeline, attachments). Shared by the unit-defects and update-defects pages.
  *  `compact` renders the update-defects column set: short number · description ·
@@ -349,7 +361,7 @@ export function ActivityTimeline({
               <div style={{ display: 'flex', gap: 10, alignItems: 'baseline' }}>
                 {a.number && (
                   <code style={{ fontFamily: 'var(--font-family-en)', fontSize: '0.74rem', color: 'var(--color-primary)', fontWeight: 700 }}>
-                    {a.number}
+                    {shortActivityNumber(a.number)}
                   </code>
                 )}
                 <span style={{ fontFamily: 'var(--font-family-en)', fontSize: '0.78rem', color: 'var(--color-text-light)', minWidth: 90 }}>
