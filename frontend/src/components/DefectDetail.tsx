@@ -85,7 +85,7 @@ export function DefectRow({
           border: 'none',
           padding: '12px 16px',
           display: 'grid',
-          gridTemplateColumns: compact ? '24px 1fr 140px 110px 110px 32px' : '24px 1fr 110px 100px 100px 110px 32px',
+          gridTemplateColumns: compact ? '24px 1fr 140px 110px 100px 100px 32px' : '24px 1fr 110px 100px 100px 110px 32px',
           gap: 10,
           alignItems: 'center',
           cursor: 'pointer',
@@ -133,6 +133,11 @@ export function DefectRow({
         <span style={{ fontSize: '0.78rem', color: 'var(--color-text-light)' }}>
           {new Date(defect.opened_at).toLocaleDateString('he-IL')}
         </span>
+        {compact && (
+          <span style={{ fontSize: '0.78rem', color: 'var(--color-text-light)' }} title="תאריך סגירה">
+            {defect.closed_at ? new Date(defect.closed_at).toLocaleDateString('he-IL') : '—'}
+          </span>
+        )}
         {canWrite ? (
           <span
             role="button"

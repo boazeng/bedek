@@ -179,14 +179,33 @@ export default function DefectFormDialog({ open, mode, unitSubtree, onClose, onS
         </Field>
       )}
 
-      <Field label="תיאור התקלה">
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 6 }}>
+          <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-light)' }}>
+            תיאור התקלה
+          </label>
+          {isEdit && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-light)', whiteSpace: 'nowrap' }}>
+                תאריך סגירה
+              </label>
+              <input
+                type="date"
+                title="ריק = פתוחה"
+                style={{ ...inputStyle, width: 'auto' }}
+                value={closedAt}
+                onChange={(e) => setClosedAt(e.target.value)}
+              />
+            </div>
+          )}
+        </div>
         <textarea
           style={{ ...inputStyle, minHeight: 52, resize: 'vertical' }}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder='למשל: "סדק בקיר הסלון", "ברז דולף במטבח"'
         />
-      </Field>
+      </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <Field label="בעל מקצוע" inline>
@@ -201,7 +220,7 @@ export default function DefectFormDialog({ open, mode, unitSubtree, onClose, onS
         </Field>
       </div>
 
-      {!isEdit ? (
+      {!isEdit && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <Field label="מקור" inline>
             <select style={inputStyle} value={source} onChange={(e) => setSource(e.target.value)}>
@@ -219,15 +238,6 @@ export default function DefectFormDialog({ open, mode, unitSubtree, onClose, onS
             />
           </Field>
         </div>
-      ) : (
-        <Field label="תאריך סגירה" hint="ריק = פתוחה" inline>
-          <input
-            type="date"
-            style={inputStyle}
-            value={closedAt}
-            onChange={(e) => setClosedAt(e.target.value)}
-          />
-        </Field>
       )}
 
       {isEdit && mode?.kind === 'edit' && (
